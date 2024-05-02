@@ -5,6 +5,9 @@ import csv
 import pytz
 import pandas as pd
 
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 from pandas import json_normalize
 
 team_abbr_to_name_mlb = {
@@ -406,11 +409,43 @@ def main():
 
     merged_df['Away EV'] = round(merged_df['Away EV'], 1)
     
+    merged_df.drop('date', axis=1, inplace=True)
+    
+    merged_df['game_date'] = today
+    merged_df['game_date'] = merged_df['game_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
     merged_df.to_csv('final_df_nhl.csv')
         
     # Display the merged dataframe
     print("Final DataFrame:")
     print(merged_df.to_string(index=False, justify='center'))
+
+
+    # Use creds to create a client to interact with the Google Drive API
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+    client = gspread.authorize(creds)
+
+    # Find a workbook by name and open the first sheet
+    # Make sure you use the exact name or URL of the spreadsheet
+
+    spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+    spreadsheet = client.open_by_key(spreadsheet_id)
+
+    # Select the first sheet
+    sheet = spreadsheet.sheet1
+
+    # Clear existing data
+    sheet.clear()
+
+    # Convert DataFrame to list of lists
+    data = merged_df.values.tolist()
+
+    # Insert the DataFrame column names as headers
+    sheet.append_row(merged_df.columns.tolist())
+
+    # Insert the data into the sheet
+    for row in data:
+        sheet.append_row(row)
 
 if __name__ == "__main__":
     main()
