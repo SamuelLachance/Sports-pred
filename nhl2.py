@@ -420,14 +420,16 @@ def main():
     print(merged_df.to_string(index=False, justify='center'))
 
 
-    # Use creds to create a client to interact with the Google Drive API
+    # Display the merged dataframe
+    print("Final DataFrame:")
+    print(merged_df.to_string(index=False, justify='center'))
+
+    # Use credentials to create a client to interact with the Google Drive API
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
     client = gspread.authorize(creds)
 
-    # Find a workbook by name and open the first sheet
-    # Make sure you use the exact name or URL of the spreadsheet
-
+    # Open the spreadsheet by its key
     spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
     spreadsheet = client.open_by_key(spreadsheet_id)
 
@@ -435,17 +437,18 @@ def main():
     sheet = spreadsheet.sheet1
 
     # Clear existing data
-    sheet.clear()
+    #sheet.clear()
 
-    # Convert DataFrame to list of lists
+    # Check if the first row is empty (indicating a need for headers)
+    if not sheet.row_values(1):  # This checks the first row for any content
+        # The sheet is empty, add the headers
+        sheet.append_row(merged_df.columns.tolist())
+
+    # Convert DataFrame to list of lists for the data rows
     data = merged_df.values.tolist()
 
-    # Insert the DataFrame column names as headers
-    sheet.append_row(merged_df.columns.tolist())
-
-    # Insert the data into the sheet
-    for row in data:
-        sheet.append_row(row)
+    # Append the data to the sheet
+    sheet.append_rows(data)  # Using append_rows for efficiency
 
 if __name__ == "__main__":
     main()

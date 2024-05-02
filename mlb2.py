@@ -5,6 +5,9 @@ import csv
 import pytz
 import pandas as pd
 
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 from pandas import json_normalize
 
 team_abbr_to_name_mlb = {
@@ -382,6 +385,8 @@ def main():
 
     merged_df.drop('Away MoneyLine', axis=1, inplace=True)
 
+    merged_df.drop('date', axis=1, inplace=True)
+
     merged_df['away_team_percentage'] = merged_df['away_team_percentage'] * 100
 
     merged_df['home_team_percentage'] = merged_df['home_team_percentage'] * 100
@@ -395,10 +400,39 @@ def main():
     merged_df['Away EV'] = round(merged_df['Away EV'], 1)
     
     merged_df.to_csv('final_df_nhl.csv')
+    
+    merged_df['game_date'] = today
+    merged_df['game_date'] = merged_df['game_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
         
     # Display the merged dataframe
     print("Final DataFrame:")
     print(merged_df.to_string(index=False, justify='center'))
+
+    # Use credentials to create a client to interact with the Google Drive API
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+    client = gspread.authorize(creds)
+
+    # Open the spreadsheet by its key
+    spreadsheet_id = '17bvX0sNEup_af6wBRlr9nYqR6ghSTDWnkLzO6-v4VBc'
+    spreadsheet = client.open_by_key(spreadsheet_id)
+
+    # Select the first sheet
+    sheet = spreadsheet.sheet1
+
+    # Clear existing data
+    #sheet.clear()
+
+    # Check if the first row is empty (indicating a need for headers)
+    if not sheet.row_values(1):  # This checks the first row for any content
+        # The sheet is empty, add the headers
+        sheet.append_row(merged_df.columns.tolist())
+
+    # Convert DataFrame to list of lists for the data rows
+    data = merged_df.values.tolist()
+
+    # Append the data to the sheet
+    sheet.append_rows(data)  # Using append_rows for efficiency
 
 if __name__ == "__main__":
     main()
