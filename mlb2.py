@@ -5,6 +5,8 @@ import csv
 import pytz
 import pandas as pd
 
+import numpy as np
+
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -280,6 +282,33 @@ def main():
 
     today = datetime.today().date()
 
+    today_2 = pd.Timestamp('now').floor('D')
+
+    elo_url = 'https://raw.githubusercontent.com/Neil-Paine-1/MLB-WAR-data-historical/master/mlb-elo-latest.csv'
+    elo_df = pd.read_csv(elo_url).drop_duplicates()
+
+    is_home = elo_df['is_home'] == 1
+    elo_df['home_team'] = np.where(is_home, elo_df['team1'], elo_df['team2'])
+    elo_df['away_team'] = np.where(is_home, elo_df['team2'], elo_df['team1'])
+    elo_df['home_team_elo'] = np.where(is_home, elo_df['elo1_pre'], elo_df['elo2_pre'])
+    elo_df['away_team_elo'] = np.where(is_home, elo_df['elo2_pre'], elo_df['elo1_pre'])
+    elo_df['home_team_percentage'] = np.where(is_home, elo_df['elo_prob1'], elo_df['elo_prob2'])
+    elo_df['away_team_percentage'] = np.where(is_home, elo_df['elo_prob2'], elo_df['elo_prob1'])
+
+    elo_df['away_team'] = elo_df['away_team'].map(team_abbr_to_name_mlb)
+    elo_df['home_team'] = elo_df['home_team'].map(team_abbr_to_name_mlb)
+
+    elo_df.rename(columns={'date': 'game_date'}, inplace=True)
+
+    elo_df['game_date'] = pd.to_datetime(elo_df['game_date'])
+
+
+    elo_df = elo_df[elo_df['game_date'] == today_2]
+
+    elo_df = elo_df[['home_team', 'away_team', 'home_team_elo', 'away_team_elo', 'home_team_percentage', 'away_team_percentage']]
+    
+    elo_df.to_csv('elo_df.csv')
+    
     odds_df = fetch_odds_data(today, True)
 
     odds_df.drop('Arena', axis=1, inplace=True)
@@ -362,13 +391,24 @@ def main():
     covers_df.to_csv('covers_df.csv')
 
     # Merge the two dataframes on the common columns (away_team and home_team)
-    merged_df = pd.merge(covers_df, dratings_df, on=['away_team', 'home_team'], how='outer')
+    merged_df = pd.merge(covers_df, elo_df, on=['away_team', 'home_team'], how='outer')
 
     # Calculate the average team percentages
     merged_df['away_team_percentage'] = (merged_df['away_team_percentage_x'] + merged_df['away_team_percentage_y']) / 2
     merged_df['home_team_percentage'] = (merged_df['home_team_percentage_x'] + merged_df['home_team_percentage_y']) / 2
 
     # Drop unnecessary columns
+    merged_df.drop(['away_team_percentage_x', 'away_team_percentage_y', 'home_team_percentage_x', 'home_team_percentage_y'], axis=1, inplace=True)
+
+    merged_df.dropna(inplace=True)
+
+    merged_df.to_csv('merged_df1.csv')
+
+    merged_df = pd.merge(merged_df, dratings_df , on=['away_team', 'home_team'], how='outer')
+
+    merged_df['away_team_percentage'] = (merged_df['away_team_percentage_x'] + merged_df['away_team_percentage_y']) / 2
+    merged_df['home_team_percentage'] = (merged_df['home_team_percentage_x'] + merged_df['home_team_percentage_y']) / 2
+
     merged_df.drop(['away_team_percentage_x', 'away_team_percentage_y', 'home_team_percentage_x', 'home_team_percentage_y'], axis=1, inplace=True)
 
     merged_df = pd.merge(merged_df, odds_df, on=['away_team', 'home_team'], how='outer')
@@ -398,8 +438,10 @@ def main():
     merged_df['Away EV'] = merged_df['Away EV'] * 100
 
     merged_df['Away EV'] = round(merged_df['Away EV'], 1)
+
+    merged_df = merged_df.drop_duplicates()
     
-    merged_df.to_csv('final_df_nhl.csv')
+    merged_df.to_csv('final_df_mlb.csv')
     
     merged_df['game_date'] = today
     merged_df['game_date'] = merged_df['game_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
@@ -421,7 +463,7 @@ def main():
     sheet = spreadsheet.sheet1
 
     # Clear existing data
-    #sheet.clear()
+    sheet.clear()
 
     # Check if the first row is empty (indicating a need for headers)
     if not sheet.row_values(1):  # This checks the first row for any content
