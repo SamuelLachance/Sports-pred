@@ -165,7 +165,7 @@ def scrape_covers(url, tipser_name):
             'game_date': utc_date,
             'away_team': away_team,
             'home_team': home_team, 
-            "sport": "mlb"
+            "sport": "nhl"
         }
 
         
@@ -355,10 +355,11 @@ def main():
     
     # Scrape from different pages of the Covers website
     covers_urls = [
-        ('https://contests.covers.com/consensus/topconsensus/nhl/overall', 'Overall Bettors'),
-        ('https://contests.covers.com/consensus/topconsensus/nhl/expert', 'Team Leaders'),
-        ('https://contests.covers.com/consensus/topconsensus/nhl/top10pct', 'Top 10%')
+        (f'https://contests.covers.com/consensus/topconsensus/nhl/overall/{today}', 'Overall Bettors'),
+        (f'https://contests.covers.com/consensus/topconsensus/nhl/expert/{today}', 'Team Leaders'),
+        (f'https://contests.covers.com/consensus/topconsensus/nhl/top10pct/{today}', 'Top 10%')
     ]
+
     
     covers_tips = []
     for url, tipser in covers_urls:
@@ -475,7 +476,7 @@ def main():
     sheet = spreadsheet.sheet1
 
     # Clear existing data
-    sheet.clear()
+    #sheet.clear()
 
     # Check if the first row is empty (indicating a need for headers)
     if not sheet.row_values(1):  # This checks the first row for any content

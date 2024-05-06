@@ -14,6 +14,7 @@ from pandas import json_normalize
 
 team_abbr_to_name_mlb = {
     'ARI': 'Arizona Diamondbacks',
+    'AZ': 'Arizona Diamondbacks',
     'ATL': 'Atlanta Braves',
     'BAL': 'Baltimore Orioles',
     'BOS': 'Boston Red Sox',
@@ -25,9 +26,12 @@ team_abbr_to_name_mlb = {
     'DET': 'Detroit Tigers',
     'HOU': 'Houston Astros',
     'KC': 'Kansas City Royals',
+    'KCR': 'Kansas City Royals',
     'LAA': 'Los Angeles Angels',
+    'ANA': 'Los Angeles Angels',
     'LAD': 'Los Angeles Dodgers',
     'MIA': 'Miami Marlins',
+    'FLA': 'Miami Marlins',
     'MIL': 'Milwaukee Brewers',
     'MIN': 'Minnesota Twins',
     'NYM': 'New York Mets',
@@ -36,14 +40,18 @@ team_abbr_to_name_mlb = {
     'PHI': 'Philadelphia Phillies',
     'PIT': 'Pittsburgh Pirates',
     'SD': 'San Diego Padres',
+    'SDP': 'San Diego Padres',
     'SEA': 'Seattle Mariners',
     'SF': 'San Francisco Giants',
+    'SFG': 'San Francisco Giants',
     'STL': 'St. Louis Cardinals',
     'TB': 'Tampa Bay Rays',
+    'TBD': 'Tampa Bay Rays',
     'TEX': 'Texas Rangers',
     'TOR': 'Toronto Blue Jays',
     'WSH': 'Washington Nationals',  # Option 1
-    'WAS': 'Washington Nationals'   # Option 2
+    'WAS': 'Washington Nationals',
+    'WSN': 'Washington Nationals'# Option 2
 }
 
 # Headers for web scraping
@@ -182,6 +190,8 @@ def scrape_covers(url, tipser_name):
 
         tips.append(tip)
 
+        print(tips)
+
     return tips
 
 def extract_team_data(json_data,predict):
@@ -287,13 +297,12 @@ def main():
     elo_url = 'https://raw.githubusercontent.com/Neil-Paine-1/MLB-WAR-data-historical/master/mlb-elo-latest.csv'
     elo_df = pd.read_csv(elo_url).drop_duplicates()
 
-    is_home = elo_df['is_home'] == 1
-    elo_df['home_team'] = np.where(is_home, elo_df['team1'], elo_df['team2'])
-    elo_df['away_team'] = np.where(is_home, elo_df['team2'], elo_df['team1'])
-    elo_df['home_team_elo'] = np.where(is_home, elo_df['elo1_pre'], elo_df['elo2_pre'])
-    elo_df['away_team_elo'] = np.where(is_home, elo_df['elo2_pre'], elo_df['elo1_pre'])
-    elo_df['home_team_percentage'] = np.where(is_home, elo_df['elo_prob1'], elo_df['elo_prob2'])
-    elo_df['away_team_percentage'] = np.where(is_home, elo_df['elo_prob2'], elo_df['elo_prob1'])
+    elo_df['away_team'] = elo_df.apply(lambda row: row['team2'] if row['is_home'] == 1 else row['team1'], axis=1)
+    elo_df['home_team'] = elo_df.apply(lambda row: row['team1'] if row['is_home'] == 1 else row['team2'], axis=1)
+    elo_df['away_team_elo'] = elo_df.apply(lambda row: row['elo2_pre'] if row['is_home'] == 1 else row['elo1_pre'], axis=1)
+    elo_df['home_team_elo'] = elo_df.apply(lambda row: row['elo1_pre'] if row['is_home'] == 1 else row['elo2_pre'], axis=1)
+    elo_df['away_team_percentage'] = elo_df.apply(lambda row: row['elo_prob2'] if row['is_home'] == 1 else row['elo_prob1'], axis=1)
+    elo_df['home_team_percentage'] = elo_df.apply(lambda row: row['elo_prob1'] if row['is_home'] == 1 else row['elo_prob2'], axis=1)
 
     elo_df['away_team'] = elo_df['away_team'].map(team_abbr_to_name_mlb)
     elo_df['home_team'] = elo_df['home_team'].map(team_abbr_to_name_mlb)
@@ -301,6 +310,9 @@ def main():
     elo_df.rename(columns={'date': 'game_date'}, inplace=True)
 
     elo_df['game_date'] = pd.to_datetime(elo_df['game_date'])
+
+
+    elo_df.to_csv('test.csv')
 
 
     elo_df = elo_df[elo_df['game_date'] == today_2]
@@ -361,14 +373,20 @@ def main():
 
     print(dratings_df)
 
+    dratings_df.dropna(inplace=True)
+
     dratings_df.to_csv('dratings_df.csv')
 
     print(covers_df)
+
+    covers_df.to_csv('covers3_df.csv')
 
     covers_df['away_team'] = covers_df['away_team'].apply(lambda x: x.upper())
 
     # Convert the 'home_team' column to uppercase
     covers_df['home_team'] = covers_df['home_team'].apply(lambda x: x.upper())
+
+    covers_df.to_csv('covers4_df.csv')
     
     decimal_places = 3  # You can adjust the number of decimal places as per your requirement
 
@@ -384,6 +402,8 @@ def main():
 
     covers_df['away_team_percentage'] = round(covers_df['away_team_percentage'] / 100, decimal_places)
     covers_df['home_team_percentage'] = round(covers_df['home_team_percentage'] / 100, decimal_places)
+
+    covers_df.to_csv('covers2_df.csv')
 
     covers_df['away_team'] = covers_df['away_team'].map(team_abbr_to_name_mlb)
     covers_df['home_team'] = covers_df['home_team'].map(team_abbr_to_name_mlb)
