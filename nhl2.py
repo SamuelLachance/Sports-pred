@@ -12,6 +12,8 @@ import numpy as np
 
 from pandas import json_normalize
 
+import urllib3
+
 team_abbr_to_name_mlb = {
     'ANA': 'Anaheim Ducks',
     'ARI': 'Arizona Coyotes',
@@ -111,91 +113,6 @@ def scrape_dratings():
 
     return tips
 
-def scrape_covers(url, tipser_name):
-    page = requests.get(url, headers=headers)
-    soup = BeautifulSoup(page.content, "html.parser")
-    table = soup.find('tbody')
-    rows = table.find_all('tr')[1:]
-    tips = []
-
-    for row in rows:
-        away_team = row.find('span', class_='covers-CoversConsensus-table--teamBlock').get_text().strip()
-        home_team = row.find('span', class_='covers-CoversConsensus-table--teamBlock2').get_text().strip()
-    
-        date_cell = row.find_all('td')[1]
-        dates = [value.strip() for value in date_cell.get_text(separator='|').split('|')]
-        
-   
-
-        # Extract month and day
-        date_str= f'{dates[0]}  {dates[1]}'
-
-            # Extract date and time components
-        date_part = date_str.split()[1:3]
-        time_part = date_str.split()[3:5]
-
-            # Create standard date and time strings
-        formatted_date_str = f"{date_part[0]} {date_part[1]} {datetime.now().year}"
-        formatted_time_str = ' '.join(time_part).replace('ET', '').strip()
-
-        # Convert to datetime objects
-        date_obj = datetime.strptime(formatted_date_str, '%b %d %Y')
-        time_obj = datetime.strptime(formatted_time_str, '%I:%M %p')
-
-        # Combine date and time into a single datetime object
-        combined_datetime = datetime.combine(date_obj, time_obj.time())
-
-        # Adjust for Eastern Time
-        eastern = pytz.timezone('US/Eastern')
-        localized_datetime = eastern.localize(combined_datetime)
-
-
-            # Convert to GMT/UTC
-        utc_datetime = localized_datetime.astimezone(pytz.utc)
-
-        # Extract just the date
-        utc_date = utc_datetime.date()
-
-        # format date as YYYY-MM-DD
-
-        utc_date = utc_date.strftime("%Y-%m-%d")
-
-
-        game = {
-            'game_date': utc_date,
-            'away_team': away_team,
-            'home_team': home_team, 
-            "sport": "nhl"
-        }
-
-        
-
-
-        cells = row.find_all('td')[4]
-        # Split the text using <br> and strip any whitespace
-        values = [value.strip() for value in cells.get_text(separator='|').split('|')]
-
-        # Assign to separate variables
-        away_team_picks, home_team_picks = values
-
-        total_picks = int(away_team_picks) + int(home_team_picks)
-        away_team_percentage = int(away_team_picks) / total_picks * 100
-        home_team_percentage = int(home_team_picks) / total_picks * 100
-
-        if int(away_team_picks) > int(home_team_picks):
-            winner = away_team
-        else:
-            winner = home_team
-
-        tipser = {"name": tipser_name, "source": source}
-
-     
-        tip = {"tipster": tipser, "game": game,"away_team": away_team,"home_team": home_team,"away_team_percentage": away_team_percentage,"home_team_percentage": home_team_percentage}
-
-        tips.append(tip)
-
-    return tips
-
 def extract_team_data(json_data,predict):
     # List to store extracted data
     extracted_data = []
@@ -289,6 +206,44 @@ def calculate_ev(model_prob, vegas_prob):
     ev = model_prob * potential_profit - prob_lose * 1  # Assuming a 1 unit bet
     
     return ev
+
+def fetch_mlb_consensus(url, tipser):
+    # Create HTTP connection
+    http = urllib3.PoolManager()
+
+    # Get webpage
+    response = http.request('GET', url)
+    soup = BeautifulSoup(response.data, 'html.parser')
+
+    # Extract tables using pandas
+    data = pd.read_html(soup.prettify())
+
+    # Combine all extracted tables into one DataFrame
+    df = pd.concat(data, ignore_index=True)
+
+    # Process 'Matchup' and 'Consensus' columns
+    df['Matchup'] = df['Matchup'].str.split().str[1:]
+    df['Consensus'] = df['Consensus'].str.split()
+
+    # Split data into pairs
+    df['Team_Consensus_Pairs'] = df.apply(lambda row: list(zip(row['Matchup'], row['Consensus'])), axis=1)
+
+    # Create new columns for teams and consensus
+    team_data = df['Team_Consensus_Pairs'].apply(lambda x: [i[0] for i in x]).tolist()
+    consensus_data = df['Team_Consensus_Pairs'].apply(lambda x: [i[1].strip('%') for i in x]).tolist()  # Stripping '%' from percentages
+
+    df[['away_team', 'home_team']] = pd.DataFrame(team_data)
+    df[['away_team_percentage', 'home_team_percentage']] = pd.DataFrame(consensus_data).astype(float)  # Convert percentage strings to float
+
+    # Assign game IDs and clean up DataFrame
+    df['gameId'] = df.index
+    df['datePull'] = datetime.today().date()
+    df['tipser'] = tipser
+    df['rowId'] = df.index
+
+    df.drop(['Matchup', 'Consensus', 'Team_Consensus_Pairs', 'Date', 'Sides', 'Picks', 'Indepth', 'gameId', 'rowId', 'datePull'], axis=1, inplace=True)
+    
+    return df
     
 def main():
 
@@ -299,13 +254,12 @@ def main():
     elo_url = 'https://raw.githubusercontent.com/Neil-Paine-1/NHL-Player-And-Team-Ratings/master/nhl_elo.csv'
     elo_df = pd.read_csv(elo_url).drop_duplicates()
 
-    is_home = elo_df['is_home'] == 1
-    elo_df['home_team'] = np.where(is_home, elo_df['team1'], elo_df['team2'])
-    elo_df['away_team'] = np.where(is_home, elo_df['team2'], elo_df['team1'])
-    elo_df['home_team_elo'] = np.where(is_home, elo_df['elo1_pre'], elo_df['elo2_pre'])
-    elo_df['away_team_elo'] = np.where(is_home, elo_df['elo2_pre'], elo_df['elo1_pre'])
-    elo_df['home_team_percentage'] = np.where(is_home, elo_df['prob1'], elo_df['prob2'])
-    elo_df['away_team_percentage'] = np.where(is_home, elo_df['prob2'], elo_df['prob1'])
+    elo_df['away_team'] = elo_df.apply(lambda row: row['team2'] if row['is_home'] == 1 else row['team1'], axis=1)
+    elo_df['home_team'] = elo_df.apply(lambda row: row['team1'] if row['is_home'] == 1 else row['team2'], axis=1)
+    elo_df['away_team_elo'] = elo_df.apply(lambda row: row['elo2_pre'] if row['is_home'] == 1 else row['elo1_pre'], axis=1)
+    elo_df['home_team_elo'] = elo_df.apply(lambda row: row['elo1_pre'] if row['is_home'] == 1 else row['elo2_pre'], axis=1)
+    elo_df['away_team_percentage'] = elo_df.apply(lambda row: row['prob2'] if row['is_home'] == 1 else row['prob1'], axis=1)
+    elo_df['home_team_percentage'] = elo_df.apply(lambda row: row['prob1'] if row['is_home'] == 1 else row['prob2'], axis=1)
 
     elo_df['away_team'] = elo_df['away_team'].map(team_abbr_to_name_mlb)
     elo_df['home_team'] = elo_df['home_team'].map(team_abbr_to_name_mlb)
@@ -313,6 +267,9 @@ def main():
     elo_df.rename(columns={'date': 'game_date'}, inplace=True)
 
     elo_df['game_date'] = pd.to_datetime(elo_df['game_date'])
+
+
+    elo_df.to_csv('test.csv')
 
 
     elo_df = elo_df[elo_df['game_date'] == today_2]
@@ -359,29 +316,36 @@ def main():
         (f'https://contests.covers.com/consensus/topconsensus/nhl/expert/{today}', 'Team Leaders'),
         (f'https://contests.covers.com/consensus/topconsensus/nhl/top10pct/{today}', 'Top 10%')
     ]
-
     
-    covers_tips = []
+    covers_tips = pd.DataFrame()
     for url, tipser in covers_urls:
         try:
-            covers_tips += scrape_covers(url, tipser)
+            tip_df = fetch_mlb_consensus(url, tipser)
+            if not tip_df.empty:
+                covers_tips = pd.concat([covers_tips, tip_df], ignore_index=True)
         except Exception as e:
             print(f'Failed to extract tips from {url}: {e}')
 
-    covers_df = convert_to_dataframe(covers_tips)
+    covers_df = covers_tips
 
     dratings_df = convert_to_dataframe(dratings_tips)
 
     print(dratings_df)
 
+    dratings_df.dropna(inplace=True)
+
     dratings_df.to_csv('dratings_df.csv')
 
     print(covers_df)
+
+    covers_df.to_csv('covers3_df.csv')
 
     covers_df['away_team'] = covers_df['away_team'].apply(lambda x: x.upper())
 
     # Convert the 'home_team' column to uppercase
     covers_df['home_team'] = covers_df['home_team'].apply(lambda x: x.upper())
+
+    covers_df.to_csv('covers4_df.csv')
     
     decimal_places = 3  # You can adjust the number of decimal places as per your requirement
 
@@ -397,6 +361,8 @@ def main():
 
     covers_df['away_team_percentage'] = round(covers_df['away_team_percentage'] / 100, decimal_places)
     covers_df['home_team_percentage'] = round(covers_df['home_team_percentage'] / 100, decimal_places)
+
+    covers_df.to_csv('covers2_df.csv')
 
     covers_df['away_team'] = covers_df['away_team'].map(team_abbr_to_name_mlb)
     covers_df['home_team'] = covers_df['home_team'].map(team_abbr_to_name_mlb)

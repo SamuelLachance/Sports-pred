@@ -12,6 +12,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 from pandas import json_normalize
 
+import urllib3
+
 team_abbr_to_name_mlb = {
     'ARI': 'Arizona Diamondbacks',
     'AZ': 'Arizona Diamondbacks',
@@ -104,93 +106,6 @@ def scrape_dratings():
         except Exception as e:
             print(f"Error processing row: {e}")
             continue
-
-    return tips
-
-def scrape_covers(url, tipser_name):
-    page = requests.get(url, headers=headers)
-    soup = BeautifulSoup(page.content, "html.parser")
-    table = soup.find('tbody')
-    rows = table.find_all('tr')[1:]
-    tips = []
-
-    for row in rows:
-        away_team = row.find('span', class_='covers-CoversConsensus-table--teamBlock').get_text().strip()
-        home_team = row.find('span', class_='covers-CoversConsensus-table--teamBlock2').get_text().strip()
-    
-        date_cell = row.find_all('td')[1]
-        dates = [value.strip() for value in date_cell.get_text(separator='|').split('|')]
-        
-   
-
-        # Extract month and day
-        date_str= f'{dates[0]}  {dates[1]}'
-
-            # Extract date and time components
-        date_part = date_str.split()[1:3]
-        time_part = date_str.split()[3:5]
-
-            # Create standard date and time strings
-        formatted_date_str = f"{date_part[0]} {date_part[1]} {datetime.now().year}"
-        formatted_time_str = ' '.join(time_part).replace('ET', '').strip()
-
-        # Convert to datetime objects
-        date_obj = datetime.strptime(formatted_date_str, '%b %d %Y')
-        time_obj = datetime.strptime(formatted_time_str, '%I:%M %p')
-
-        # Combine date and time into a single datetime object
-        combined_datetime = datetime.combine(date_obj, time_obj.time())
-
-        # Adjust for Eastern Time
-        eastern = pytz.timezone('US/Eastern')
-        localized_datetime = eastern.localize(combined_datetime)
-
-
-            # Convert to GMT/UTC
-        utc_datetime = localized_datetime.astimezone(pytz.utc)
-
-        # Extract just the date
-        utc_date = utc_datetime.date()
-
-        # format date as YYYY-MM-DD
-
-        utc_date = utc_date.strftime("%Y-%m-%d")
-
-
-        game = {
-            'game_date': utc_date,
-            'away_team': away_team,
-            'home_team': home_team, 
-            "sport": "mlb"
-        }
-
-        
-
-
-        cells = row.find_all('td')[4]
-        # Split the text using <br> and strip any whitespace
-        values = [value.strip() for value in cells.get_text(separator='|').split('|')]
-
-        # Assign to separate variables
-        away_team_picks, home_team_picks = values
-
-        total_picks = int(away_team_picks) + int(home_team_picks)
-        away_team_percentage = int(away_team_picks) / total_picks * 100
-        home_team_percentage = int(home_team_picks) / total_picks * 100
-
-        if int(away_team_picks) > int(home_team_picks):
-            winner = away_team
-        else:
-            winner = home_team
-
-        tipser = {"name": tipser_name, "source": source}
-
-     
-        tip = {"tipster": tipser, "game": game,"away_team": away_team,"home_team": home_team,"away_team_percentage": away_team_percentage,"home_team_percentage": home_team_percentage}
-
-        tips.append(tip)
-
-        print(tips)
 
     return tips
 
@@ -287,6 +202,44 @@ def calculate_ev(model_prob, vegas_prob):
     ev = model_prob * potential_profit - prob_lose * 1  # Assuming a 1 unit bet
     
     return ev
+
+def fetch_mlb_consensus(url, tipser):
+    # Create HTTP connection
+    http = urllib3.PoolManager()
+
+    # Get webpage
+    response = http.request('GET', url)
+    soup = BeautifulSoup(response.data, 'html.parser')
+
+    # Extract tables using pandas
+    data = pd.read_html(soup.prettify())
+
+    # Combine all extracted tables into one DataFrame
+    df = pd.concat(data, ignore_index=True)
+
+    # Process 'Matchup' and 'Consensus' columns
+    df['Matchup'] = df['Matchup'].str.split().str[1:]
+    df['Consensus'] = df['Consensus'].str.split()
+
+    # Split data into pairs
+    df['Team_Consensus_Pairs'] = df.apply(lambda row: list(zip(row['Matchup'], row['Consensus'])), axis=1)
+
+    # Create new columns for teams and consensus
+    team_data = df['Team_Consensus_Pairs'].apply(lambda x: [i[0] for i in x]).tolist()
+    consensus_data = df['Team_Consensus_Pairs'].apply(lambda x: [i[1].strip('%') for i in x]).tolist()  # Stripping '%' from percentages
+
+    df[['away_team', 'home_team']] = pd.DataFrame(team_data)
+    df[['away_team_percentage', 'home_team_percentage']] = pd.DataFrame(consensus_data).astype(float)  # Convert percentage strings to float
+
+    # Assign game IDs and clean up DataFrame
+    df['gameId'] = df.index
+    df['datePull'] = datetime.today().date()
+    df['tipser'] = tipser
+    df['rowId'] = df.index
+
+    df.drop(['Matchup', 'Consensus', 'Team_Consensus_Pairs', 'Date', 'Sides', 'Picks', 'Indepth', 'gameId', 'rowId', 'datePull'], axis=1, inplace=True)
+    
+    return df
     
 def main():
 
@@ -355,19 +308,21 @@ def main():
     
     # Scrape from different pages of the Covers website
     covers_urls = [
-        ('https://contests.covers.com/consensus/topconsensus/mlb/overall', 'Overall Bettors'),
-        ('https://contests.covers.com/consensus/topconsensus/mlb/expert', 'Team Leaders'),
-        ('https://contests.covers.com/consensus/topconsensus/mlb/top10pct', 'Top 10%')
+        (f'https://contests.covers.com/consensus/topconsensus/mlb/overall/{today}', 'Overall Bettors'),
+        (f'https://contests.covers.com/consensus/topconsensus/mlb/expert/{today}', 'Team Leaders'),
+        (f'https://contests.covers.com/consensus/topconsensus/mlb/top10pct/{today}', 'Top 10%')
     ]
     
-    covers_tips = []
+    covers_tips = pd.DataFrame()
     for url, tipser in covers_urls:
         try:
-            covers_tips += scrape_covers(url, tipser)
+            tip_df = fetch_mlb_consensus(url, tipser)
+            if not tip_df.empty:
+                covers_tips = pd.concat([covers_tips, tip_df], ignore_index=True)
         except Exception as e:
             print(f'Failed to extract tips from {url}: {e}')
 
-    covers_df = convert_to_dataframe(covers_tips)
+    covers_df = covers_tips
 
     dratings_df = convert_to_dataframe(dratings_tips)
 
