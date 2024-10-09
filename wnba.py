@@ -170,7 +170,7 @@ def fetch_sharp_data(date):
     print(f"End Date: {end_date}")
 
     # Build the URL
-    base_url = f"https://graph.sharp.app/operations/v1/events/LegacyByDates?wg_api_hash=0bd8d897&wg_variables={{\"league\":\"NHL\",\"startAt\":\"{start_date}\",\"endAt\":\"{end_date}\"}}"
+    base_url = f"https://graph.sharp.app/operations/v1/events/LegacyByDates?wg_api_hash=0bd8d897&wg_variables={{\"league\":\"WNBA\",\"startAt\":\"{start_date}\",\"endAt\":\"{end_date}\"}}"
     print(base_url)
 
     headers = {
@@ -380,7 +380,6 @@ def update_with_ai_predictions(df):
 
     return df
 
-
 def fetch_handles(game_id):
     url = f"https://graph.sharp.app/operations/v1/handles/ByGameId?wg_api_hash=0bd8d897&wg_variables=%7B%22gameId%22%3A{game_id}%7D"
     print(url)
@@ -432,34 +431,33 @@ def update_with_handles(df):
         handles_data = fetch_handles(game_id)
         
         if handles_data:
-            away_moneyline = handles_data['away_moneyline']
-            home_moneyline = handles_data['home_moneyline']
+            away_spread = handles_data['away_spread']
+            home_spread = handles_data['home_spread']
             total_over = handles_data['total_over']
             total_under = handles_data['total_under']
             
             # Update the DataFrame with the fetched handle data
-            if away_moneyline:
-                df.at[i, 'away_money'] = away_moneyline['moneyPercentage']
-            if home_moneyline:
-                df.at[i, 'home_money'] = home_moneyline['moneyPercentage']
+            if away_spread:
+                df.at[i, 'away_money'] = away_spread['moneyPercentage']
+            if home_spread:
+                df.at[i, 'home_money'] = home_spread['moneyPercentage']
             if total_over:
                 df.at[i, 'over_money'] = total_over['moneyPercentage']
             if total_under:
                 df.at[i, 'under_money'] = total_under['moneyPercentage']
 
     return df
-
     
 def main():
 
-    today = datetime.today().date() #+ pd.Timedelta(days=1)
+    today = datetime.today().date()
 
     decimal_places = 3
 
     # Fetch sharp data and AI predictions (assuming these functions exist and work properly)
     sharp_df = fetch_sharp_data(today)
     sharp_df = update_with_ai_predictions(sharp_df)
-    sharp_df = update_with_handles(sharp_df)
+    #sharp_df = update_with_handles(sharp_df)
 
     cols_to_convert = ['awayMoneyLine', 'homeMoneyLine']
 
@@ -484,7 +482,7 @@ def main():
     sharp_df.to_csv('sharp_df.csv', index=False)
 
     # Clean the DataFrame by dropping unwanted columns in a single line
-    sharp_df.drop(columns=['homeSpread', 'awaySpread', 'homeMoneyLine', 'awayMoneyLine', 'homeTeamId', 'awayTeamId', 'overUnder', 'gameId', 'homeTeamName', 'awayTeamName','away_spread','home_spread'], inplace=True)
+    sharp_df.drop(columns=['homeSpread', 'awaySpread', 'homeMoneyLine', 'awayMoneyLine', 'homeTeamId', 'awayTeamId', 'overUnder', 'gameId', 'homeTeamName', 'awayTeamName'], inplace=True)
 
     # Ensure the 'Date' column is fully converted to string format
     sharp_df['Date'] = pd.to_datetime(sharp_df['Date']).dt.strftime('%Y-%m-%d')
@@ -520,14 +518,14 @@ def main():
     client = gspread.authorize(creds)
 
     # Open the spreadsheet by its key
-    spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+    spreadsheet_id = '1Spfeh_UBt3g9BNo_Zek9jekrsFLQOY-D4uJ9wKA8fCg'
     spreadsheet = client.open_by_key(spreadsheet_id)
 
     # Select the first sheet
     sheet = spreadsheet.sheet1
 
     # Clear existing data
-    #sheet.clear()
+    sheet.clear()
 
     # Append headers if the first row is empty
     if not sheet.row_values(1):
