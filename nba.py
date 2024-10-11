@@ -170,7 +170,7 @@ def fetch_sharp_data(date):
     print(f"End Date: {end_date}")
 
     # Build the URL
-    base_url = f"https://graph.sharp.app/operations/v1/events/LegacyByDates?wg_api_hash=0bd8d897&wg_variables={{\"league\":\"NFL\",\"startAt\":\"{start_date}\",\"endAt\":\"{end_date}\"}}"
+    base_url = f"https://graph.sharp.app/operations/v1/events/LegacyByDates?wg_api_hash=0bd8d897&wg_variables={{\"league\":\"NBA\",\"startAt\":\"{start_date}\",\"endAt\":\"{end_date}\"}}"
     print(base_url)
 
     headers = {
@@ -518,7 +518,7 @@ def main():
     client = gspread.authorize(creds)
 
     # Open the spreadsheet by its key
-    spreadsheet_id = '1UcmQOaDViWVQdH99G_YFJ1xW-nRo6fnqBgL4LD3yRSM'
+    spreadsheet_id = '1J_VjAUTF-0aSfd3ObPaIr1AJWYmdLhYRG-o8C-II4LA'
     spreadsheet = client.open_by_key(spreadsheet_id)
 
     # Select the first sheet
