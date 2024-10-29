@@ -121,32 +121,37 @@ def extract_sharp_data(data):
     for event in data['data']['events']:
         game_id = event['gameId']
         
-        # Find consensus odds (sportsbookId: 22)
-        consensus_odds = next((odds for odds in event['odds']['pregame'] if odds['sportsbookId'] == 22), None)
+        # Initialize variables to None to handle missing data
+        away_moneyline = home_moneyline = away_spread = home_spread = over_under = None
 
-        # If consensus odds exist, extract them
-        if consensus_odds:
-            away_moneyline = consensus_odds.get('awayMoneyLine', None)
-            home_moneyline = consensus_odds.get('homeMoneyLine', None)
-            away_spread = consensus_odds.get('awaySpread', None)
-            home_spread = consensus_odds.get('homeSpread', None)
-            over_under = consensus_odds.get('overUnder', None)
-        else:
-            away_moneyline = home_moneyline = away_spread = home_spread = over_under = None
+        # Check if 'odds' and 'pregame' data are available and is iterable
+        odds_data = event.get('odds', {})
+        pregame_odds = odds_data.get('pregame')
+        if isinstance(pregame_odds, list):
+            # Find consensus odds (sportsbookId: 22)
+            consensus_odds = next((odds for odds in pregame_odds if odds.get('sportsbookId') == 22), None)
+            
+            # If consensus odds exist, extract them
+            if consensus_odds:
+                away_moneyline = consensus_odds.get('awayMoneyLine')
+                home_moneyline = consensus_odds.get('homeMoneyLine')
+                away_spread = consensus_odds.get('awaySpread')
+                home_spread = consensus_odds.get('homeSpread')
+                over_under = consensus_odds.get('overUnder')
 
-        # Extract home and away team data
-        away_team = next(team for team in event['teams'] if team['teamId'] == event['awayTeamId'])
-        home_team = next(team for team in event['teams'] if team['teamId'] == event['homeTeamId'])
+        # Extract home and away team data with safe access
+        away_team = next((team for team in event.get('teams', []) if team.get('teamId') == event.get('awayTeamId')), {})
+        home_team = next((team for team in event.get('teams', []) if team.get('teamId') == event.get('homeTeamId')), {})
 
         # Append the data in the desired format
         game_data.append({
             'gameId': game_id,
-            'awayTeamId': away_team['teamId'],
-            'awayTeamKey': away_team['key'],
-            'awayTeamName': away_team['displayName'],
-            'homeTeamId': home_team['teamId'],
-            'homeTeamKey': home_team['key'],
-            'homeTeamName': home_team['displayName'],
+            'awayTeamId': away_team.get('teamId'),
+            'awayTeamKey': away_team.get('key'),
+            'awayTeamName': away_team.get('displayName'),
+            'homeTeamId': home_team.get('teamId'),
+            'homeTeamKey': home_team.get('key'),
+            'homeTeamName': home_team.get('displayName'),
             'awayMoneyLine': away_moneyline,
             'homeMoneyLine': home_moneyline,
             'awaySpread': away_spread,
@@ -328,30 +333,43 @@ def fetch_mlb_consensus(url, tipser):
     return df
 
 def fetch_ai_predictions(game_id):
-    url = f"https://graph.sharp.app/operations/v1/ai-predictions/ByGameId?wg_api_hash=0bd8d897&wg_variables=%7B%22gameId%22%3A{game_id}%7D"
-    print(url)
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        data = response.json()['data']['predictions']
-        
-        # Extract the win percentages for both teams
-        teams = data['teams']
-        total = data['overUnder']
-        away_team = teams[0]
-        home_team = teams[1]
-        
-        away_team_id = away_team['teamId']
-        away_win_percentage = away_team['winPercentage']
-        away_spread = away_team['spread']
-        home_team_id = home_team['teamId']
-        home_spread = home_team['spread']
-        home_win_percentage = home_team['winPercentage']
-        
-        return away_win_percentage, home_win_percentage, away_spread, home_spread, total
-    else:
-        # Return None if there was an error with the request
-        return None, None
+    try:
+        url = f"https://graph.sharp.app/operations/v1/ai-predictions/ByGameId?wg_api_hash=0bd8d897&wg_variables=%7B%22gameId%22%3A{game_id}%7D"
+        print(url)
+        response = requests.get(url)
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            data = response.json().get('data', {}).get('predictions', None)
+            
+            if data:
+                # Extract the win percentages for both teams
+                teams = data.get('teams', [])
+                total = data.get('overUnder', None)
+                
+                if len(teams) == 2:  # Ensure we have both teams' data
+                    away_team = teams[0]
+                    home_team = teams[1]
+                    
+                    away_win_percentage = away_team.get('winPercentage', None)
+                    away_spread = away_team.get('spread', None)
+                    home_win_percentage = home_team.get('winPercentage', None)
+                    home_spread = home_team.get('spread', None)
+                    
+                    return away_win_percentage, home_win_percentage, away_spread, home_spread, total
+                else:
+                    print(f"Warning: Could not find data for both teams for game ID {game_id}")
+                    return None, None, None, None, None
+            else:
+                print(f"Warning: No prediction data found for game ID {game_id}")
+                return None, None, None, None, None
+        else:
+            print(f"Error: Failed to fetch data for game ID {game_id}, status code: {response.status_code}")
+            return None, None, None, None, None
+
+    except Exception as e:
+        print(f"Error: Exception occurred while fetching AI predictions for game ID {game_id} - {e}")
+        return None, None, None, None, None
 
 # Function to update the DataFrame with AI win percentages
 def update_with_ai_predictions(df):
@@ -386,21 +404,33 @@ def fetch_handles(game_id):
     response = requests.get(url)
     
     if response.status_code == 200:
-        data = response.json()['data']['handles']
+        data = response.json().get('data', {}).get('handles')
 
-        # Extract data for spread
-        spread_data = data['spread']
-        total_data = data['total']
-        moneyline_data = data['moneyline']
-        
-        away_spread_info = next((item for item in spread_data if item['outcomeType'] == 'Away'), None)
-        home_spread_info = next((item for item in spread_data if item['outcomeType'] == 'Home'), None)
-        
-        away_moneyline_info = next((item for item in moneyline_data if item['outcomeType'] == 'Away'), None)
-        home_moneyline_info = next((item for item in moneyline_data if item['outcomeType'] == 'Home'), None)
+        # Check if data is None and initialize it as an empty dictionary if so
+        if data is None:
+            data = {}
 
-        total_over_info = next((item for item in total_data if item['outcomeType'] == 'Over'), None)
-        total_under_info = next((item for item in total_data if item['outcomeType'] == 'Under'), None)
+        # Extract data for spread, total, and moneyline
+        spread_data = data.get('spread', [])
+        total_data = data.get('total', [])
+        moneyline_data = data.get('moneyline', [])
+
+        # Ensure that each dataset is iterable before proceeding
+        if not isinstance(spread_data, list):
+            spread_data = []
+        if not isinstance(total_data, list):
+            total_data = []
+        if not isinstance(moneyline_data, list):
+            moneyline_data = []
+
+        away_spread_info = next((item for item in spread_data if item.get('outcomeType') == 'Away'), None)
+        home_spread_info = next((item for item in spread_data if item.get('outcomeType') == 'Home'), None)
+
+        away_moneyline_info = next((item for item in moneyline_data if item.get('outcomeType') == 'Away'), None)
+        home_moneyline_info = next((item for item in moneyline_data if item.get('outcomeType') == 'Home'), None)
+
+        total_over_info = next((item for item in total_data if item.get('outcomeType') == 'Over'), None)
+        total_under_info = next((item for item in total_data if item.get('outcomeType') == 'Under'), None)
 
         return {
             'away_spread': away_spread_info,
@@ -511,6 +541,8 @@ def main():
     sharp_df['Away EV'] = sharp_df['Away EV'] * 100
 
     sharp_df['Away EV'] = round(sharp_df['Away EV'], 1)
+
+    sharp_df = sharp_df.dropna()
 
     # Use credentials to create a client to interact with the Google Drive API
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']

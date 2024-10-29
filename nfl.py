@@ -328,30 +328,43 @@ def fetch_mlb_consensus(url, tipser):
     return df
 
 def fetch_ai_predictions(game_id):
-    url = f"https://graph.sharp.app/operations/v1/ai-predictions/ByGameId?wg_api_hash=0bd8d897&wg_variables=%7B%22gameId%22%3A{game_id}%7D"
-    print(url)
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        data = response.json()['data']['predictions']
-        
-        # Extract the win percentages for both teams
-        teams = data['teams']
-        total = data['overUnder']
-        away_team = teams[0]
-        home_team = teams[1]
-        
-        away_team_id = away_team['teamId']
-        away_win_percentage = away_team['winPercentage']
-        away_spread = away_team['spread']
-        home_team_id = home_team['teamId']
-        home_spread = home_team['spread']
-        home_win_percentage = home_team['winPercentage']
-        
-        return away_win_percentage, home_win_percentage, away_spread, home_spread, total
-    else:
-        # Return None if there was an error with the request
-        return None, None
+    try:
+        url = f"https://graph.sharp.app/operations/v1/ai-predictions/ByGameId?wg_api_hash=0bd8d897&wg_variables=%7B%22gameId%22%3A{game_id}%7D"
+        print(url)
+        response = requests.get(url)
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            data = response.json().get('data', {}).get('predictions', None)
+            
+            if data:
+                # Extract the win percentages for both teams
+                teams = data.get('teams', [])
+                total = data.get('overUnder', None)
+                
+                if len(teams) == 2:  # Ensure we have both teams' data
+                    away_team = teams[0]
+                    home_team = teams[1]
+                    
+                    away_win_percentage = away_team.get('winPercentage', None)
+                    away_spread = away_team.get('spread', None)
+                    home_win_percentage = home_team.get('winPercentage', None)
+                    home_spread = home_team.get('spread', None)
+                    
+                    return away_win_percentage, home_win_percentage, away_spread, home_spread, total
+                else:
+                    print(f"Warning: Could not find data for both teams for game ID {game_id}")
+                    return None, None, None, None, None
+            else:
+                print(f"Warning: No prediction data found for game ID {game_id}")
+                return None, None, None, None, None
+        else:
+            print(f"Error: Failed to fetch data for game ID {game_id}, status code: {response.status_code}")
+            return None, None, None, None, None
+
+    except Exception as e:
+        print(f"Error: Exception occurred while fetching AI predictions for game ID {game_id} - {e}")
+        return None, None, None, None, None
 
 # Function to update the DataFrame with AI win percentages
 def update_with_ai_predictions(df):
@@ -450,7 +463,7 @@ def update_with_handles(df):
     
 def main():
 
-    today = datetime.today().date()
+    today = datetime.today().date() #+ pd.Timedelta(days=1)
 
     decimal_places = 3
 
@@ -461,10 +474,10 @@ def main():
 
     cols_to_convert = ['awayMoneyLine', 'homeMoneyLine']
 
+    print(sharp_df)
+
     for col in cols_to_convert:
         sharp_df[col] = sharp_df[col].apply(moneyline_to_proba)
-
-    sharp_df.to_csv('sharp_df.csv', index=False)
 
     sharp_df['awayWinPercentage'] = pd.to_numeric(sharp_df['awayWinPercentage'], errors='coerce')
 
@@ -512,6 +525,8 @@ def main():
 
     sharp_df['Away EV'] = round(sharp_df['Away EV'], 1)
 
+    sharp_df = sharp_df.dropna()
+
     # Use credentials to create a client to interact with the Google Drive API
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
@@ -525,7 +540,7 @@ def main():
     sheet = spreadsheet.sheet1
 
     # Clear existing data
-    sheet.clear()
+    #sheet.clear()
 
     # Append headers if the first row is empty
     if not sheet.row_values(1):

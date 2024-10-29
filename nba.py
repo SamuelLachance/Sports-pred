@@ -525,7 +525,7 @@ def main():
     sheet = spreadsheet.sheet1
 
     # Clear existing data
-    sheet.clear()
+    #sheet.clear()
 
     # Append headers if the first row is empty
     if not sheet.row_values(1):
