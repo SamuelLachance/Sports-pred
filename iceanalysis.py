@@ -32,6 +32,7 @@ def calculate_ev(model_prob, vegas_prob):
 
 def fetch_odds_data(date, predict):
     base_url = f"https://www.oddsshark.com/api/scores/nhl/{date}?_format=json"
+    print(base_url)
     headers = {
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://www.oddsshark.com/nhl/scores',
@@ -60,6 +61,8 @@ def extract_team_data(json_data, predict):
         home_team = game['teams']['home']
         away_team = game['teams']['away']
         game_data['Home Name'] = home_team['names']['name']
+        if game_data['Home Name'] == 'Montreal Canadiens':
+            game_data['Home Name'] = 'Montréal Canadiens'
         game_data['Home MoneyLine'] = home_team['moneyLine']
         game_data['Home Spread Price'] = home_team['spreadPrice']
         game_data['Home Score'] = home_team['score']
@@ -70,6 +73,8 @@ def extract_team_data(json_data, predict):
             game_data['won_game'] = home_team['score'] > away_team['score']
         
         game_data['Away Name'] = away_team['names']['name']
+        if game_data['Away Name'] == 'Montreal Canadiens':
+            game_data['Away Name'] = 'Montréal Canadiens'
         game_data['Away MoneyLine'] = away_team['moneyLine']
         game_data['Away Spread Price'] = away_team['spreadPrice']
         game_data['Away Score'] = away_team['score']

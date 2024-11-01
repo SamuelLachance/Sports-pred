@@ -10,6 +10,9 @@ import json
 import os
 import time
 from datetime import datetime, timedelta
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from pandas import json_normalize
 
 class Team():
     def __init__(self, name):
@@ -505,7 +508,185 @@ def extra_menu(total_game_list, team_list, param):
 
         return
 
+def moneyline_to_proba(moneyline):
+    if moneyline < 0:
+        return -moneyline / (-moneyline + 100)
+    else:
+        return 100 / (moneyline + 100)
+
+
+def calculate_ev(model_prob, vegas_prob):
+    """
+    Calculate the Expected Value (EV) for betting based on the provided probabilities.
+
+    Parameters:
+    - model_prob: Model's probability of the team (home or away) winning.
+    - vegas_prob: Sportsbook's implied probability based on the odds.
+
+    Returns:
+    - EV for betting on the team.
+    """
+    potential_profit = (1 / vegas_prob) - 1
+    prob_lose = 1 - model_prob
+    ev = model_prob * potential_profit - prob_lose * 1  # Assuming a 1 unit bet
+    
+    return ev
+
+def fetch_odds_data(date, predict):
+    base_url = f"https://www.oddsshark.com/api/scores/nhl/{date}?_format=json"
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.oddsshark.com/nhl/scores',
+        'Sec-Ch-Ua': '"Chromium";v="118", "Microsoft Edge";v="118", "Not=A?Brand";v="99"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 Edg/118.0.2088.44'
+    }
+    response = requests.get(base_url, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        df = extract_team_data(data, predict)
+        df['Date'] = date
+        df.to_csv(f"odds_data_{date}.csv", index=False)
+        return df
+    else:
+        print(f"Failed to fetch data for date: {date}")
+        return None
+
+def extract_team_data(json_data, predict):
+    extracted_data = []
+    for game in json_data['scores']:
+        game_data = {}
+        
+        home_team = game['teams']['home']
+        away_team = game['teams']['away']
+        game_data['Home Name'] = home_team['names']['name']
+        if game_data['Home Name'] == 'Montreal Canadiens':
+            game_data['Home Name'] = 'Montréal Canadiens'
+        game_data['Home MoneyLine'] = home_team['moneyLine']
+        game_data['Home Spread Price'] = home_team['spreadPrice']
+        game_data['Home Score'] = home_team['score']
+        game_data['Home Votes'] = home_team['votes']
+        game_data['Home Spread'] = home_team['spread']
+
+        if not predict:
+            game_data['won_game'] = home_team['score'] > away_team['score']
+        
+        game_data['Away Name'] = away_team['names']['name']
+        if game_data['Away Name'] == 'Montreal Canadiens':
+            game_data['Away Name'] = 'Montréal Canadiens'
+        game_data['Away MoneyLine'] = away_team['moneyLine']
+        game_data['Away Spread Price'] = away_team['spreadPrice']
+        game_data['Away Score'] = away_team['score']
+        game_data['Away Votes'] = away_team['votes']
+        game_data['Away Spread'] = away_team['spread']
+
+        game_data['Under Price'] = game['underPrice']
+        game_data['Over Price'] = game['overPrice']
+        game_data['Over Votes'] = game['overVotes']
+        game_data['Under Votes'] = game['underVotes']
+        game_data['Total'] = game['total']
+        if not predict:
+            game_data['Totals'] = home_team['score'] + away_team['score']
+        game_data['Arena'] = game['stadium']
+        
+        extracted_data.append(game_data)
+
+    df = pd.DataFrame(extracted_data)
+    return df
+
+def convert_to_dataframe(data):
+    # Normalize the nested structure into a flat DataFrame
+    df = json_normalize(data, sep='_')
+    return df
+
+def merge_odds_and_projections(odds_df, projections_df):
+    decimal_places = 3
+    
+    merged_df = pd.merge(
+        odds_df, 
+        projections_df,
+        left_on=['Home Name', 'Away Name'],
+        right_on=['Home Team', 'Away Team'],
+        how='inner'
+    )
+    
+    # Select only the specified columns
+    merged_df = merged_df[
+        ['Date','Home Name', 'Away Name', 'Home MoneyLine', 'Away MoneyLine',
+         'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']
+    ]
+
+    cols_to_convert = ['Home MoneyLine', 'Away MoneyLine']
+
+    for col in cols_to_convert:
+        merged_df[col] = merged_df[col].apply(moneyline_to_proba)
+
+    merged_df['Pre-Game Away Win Probability'] = merged_df['Pre-Game Away Win Probability'].str.rstrip('%').astype(float)
+    merged_df['Pre-Game Home Win Probability'] = merged_df['Pre-Game Home Win Probability'].str.rstrip('%').astype(float)
+
+    merged_df['Pre-Game Away Win Probability'] = pd.to_numeric(merged_df['Pre-Game Away Win Probability'], errors='coerce')
+
+    merged_df['Pre-Game Home Win Probability'] = pd.to_numeric(merged_df['Pre-Game Home Win Probability'], errors='coerce')
+
+    merged_df['Pre-Game Away Win Probability'] = round(merged_df['Pre-Game Away Win Probability']/100, decimal_places)
+    merged_df['Pre-Game Home Win Probability'] = round(merged_df['Pre-Game Home Win Probability']/100, decimal_places)
+
+    # Calculate Expected Value (EV) for Away Team
+    merged_df['Away EV'] = merged_df.apply(lambda x: calculate_ev(x['Pre-Game Away Win Probability'], x['Away MoneyLine']), axis=1)
+
+    # Calculate Expected Value (EV) for Home Team
+    merged_df['Home EV'] = merged_df.apply(lambda x: calculate_ev(x['Pre-Game Home Win Probability'], x['Home MoneyLine']), axis=1)
+
+    merged_df['Pre-Game Away Win Probability'] = round(merged_df['Pre-Game Away Win Probability'] * 100,1)
+
+    merged_df['Pre-Game Home Win Probability'] = round(merged_df['Pre-Game Home Win Probability'] * 100,1)
+
+    merged_df['Home EV'] = merged_df['Home EV'] * 100
+
+    merged_df['Home EV'] = round(merged_df['Home EV'], 1)
+
+    merged_df['Away EV'] = merged_df['Away EV'] * 100
+
+    merged_df['Away EV'] = round(merged_df['Away EV'], 1)
+
+    merged_df.drop(columns=['Home MoneyLine', 'Away MoneyLine'], inplace=True)
+
+    #merged_df = convert_to_dataframe(merged_df)
+
+    # Use credentials to create a client to interact with the Google Drive API
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+    client = gspread.authorize(creds)
+
+    # Open the spreadsheet by its key
+    spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+    spreadsheet = client.open_by_key(spreadsheet_id)
+
+    sheet_name = 'BoomerModel'
+    
+    # Select the first sheet
+    sheet = spreadsheet.worksheet(sheet_name)
+
+    # Clear existing data
+    #sheet.clear()
+
+    # Append headers if the first row is empty
+    if not sheet.row_values(1):
+        sheet.append_row(merged_df.columns.tolist())  # Add headers
+
+    # Convert DataFrame to a list of lists for the data rows
+    data = merged_df.values.tolist()
+
+    # Append the data rows to the sheet
+    sheet.append_rows(data)  # Efficiently append the rows
+
+        
+    return merged_df
+
 def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, total_game_list, team_list, date):
+    date = (datetime.today() + timedelta(days=0)).strftime('%Y-%m-%d')
     while True:
         print("""--MAIN MENU--
     1. View Power Rankings
@@ -534,6 +715,8 @@ def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, to
             download_csv_option(power_df, 'power_rankings')
         elif user_option == 2:
             if today_games_df is not None:
+                odds_df = fetch_odds_data(date, True)
+                merged_df = merge_odds_and_projections(odds_df, today_games_df)
                 print(today_games_df)
                 download_csv_option(today_games_df, f'{date}_games')
             else:
