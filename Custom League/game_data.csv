@@ -1,0 +1,584 @@
+Home Team,Home Score,Visitor Score,Visiting Team
+Tulane Green Wave,34,3,Charlotte
+Kennesaw State,14,31,Western Kentucky Hilltoppers
+Jacksonville State,31,21,Liberty Flames
+Louisiana Tech Bulldogs,3,9,Sam Houston State
+Louisiana-Lafayette Ragin' Cajuns,23,17,Texas State Bobcats
+New Mexico State Aggies,13,34,FIU Golden Panthers
+Nevada Wolf Pack,13,34,Hawaii Warriors
+Washington State Cougars,29,26,San Diego State Aztecs
+Cincinnati Bearcats,23,34,Colorado Buffaloes
+Kansas Jayhawks,27,29,Kansas State Wildcats
+San Jose State Spartans,10,33,Fresno State Bulldogs
+SMU Mustangs,28,27,Duke Blue Devils
+Auburn Tigers,24,10,Kentucky Wildcats
+LSU Tigers,23,38,Texas A&M Aggies
+Michigan State Spartans,17,24,Michigan Wolverines
+Penn State Nittany Lions,28,13,Wisconsin Badgers
+Florida State Seminoles,14,36,Miami Hurricanes
+Troy Trojans,31,34,Arkansas State Red Wolves
+Utah State Aggies,27,25,Wyoming Cowboys
+Utah Utes,14,17,Houston Cougars
+West Virginia Mountaineers,31,26,Arizona Wildcats
+Louisiana-Monroe Warhawks,17,46,South Alabama
+New Mexico Lobos,6,17,Colorado State Rams
+Texas Longhorns,27,24,Vanderbilt Commodores
+Oregon State Beavers,7,44,Cal Golden Bears
+Bowling Green Falcons,41,26,Toledo Rockets
+Brigham Young Cougars,37,24,UCF Knights
+Eastern Michigan Eagles,21,25,Akron Zips
+Illinois Fighting Illini,9,38,Oregon Ducks
+Kent State Golden Flashes,21,52,Western Michigan Broncos
+Maryland Terrapins,23,48,Minnesota Golden Gophers
+Missouri Tigers,0,34,Alabama Crimson Tide
+Northern Illinois Huskies,23,25,Ball State Cardinals
+Northwestern Wildcats,14,40,Iowa Hawkeyes
+Oklahoma State Cowboys,28,38,Baylor Bears
+Rice Owls,10,17,Connecticut Huskies
+Southern Miss Golden Eagles,15,32,James Madison
+Texas Tech Red Raiders,34,35,TCU Horned Frogs
+UTSA,45,46,Tulsa Golden Hurricane
+Wagner,7,35,UMass Minutemen
+Wake Forest Demon Deacons,27,24,Stanford Cardinal
+Central Michigan Chippewas,7,46,Miami RedHawks
+Temple Owls,34,56,East Carolina Pirates
+Georgia State Panthers,26,33,Appalachian State
+Arkansas Razorbacks,58,25,Mississippi State Bulldogs
+Buffalo Bulls,16,47,Ohio Bobcats
+Charlotte,28,33,Memphis Tigers
+Georgia Tech Yellow Jackets,6,21,Virginia Tech Hokies
+Nebraska Cornhuskers,17,21,Ohio State Buckeyes
+North Carolina Tar Heels,41,14,Virginia Cavaliers
+Notre Dame Fighting Irish,51,14,Navy Midshipmen
+Oklahoma Sooners,14,26,Ole Miss Rebles
+Tulane Green Wave,45,37,North Texas Mean Green
+Washington Huskies,17,31,Indiana Hoosiers
+Rutgers Scarlet Knights,20,42,USC Trojans
+Boise State Broncos,29,24,UNLV Rebels
+Louisville Cardinals,31,27,Boston College Eagles
+Syracuse Orange,13,41,Pittsburgh Panthers
+Georgia Southern,19,47,Old Dominion
+Middle Tennessee St. Blue Raiders,20,42,Jacksonville State
+Liberty Flames,24,27,Kennesaw State
+UTEP Miners,10,14,Louisiana Tech Bulldogs
+Sam Houston State,10,7,FIU Golden Panthers
+TCU Horned Frogs,13,7,Utah Utes
+UNLV Rebels,33,25,Oregon State Beavers
+Colorado State Rams,21,13,Air Force Falcons
+SMU Mustangs,40,10,Stanford Cardinal
+Kentucky Wildcats,20,48,Florida Gators
+Georgia Bulldogs,30,15,Texas Longhorns
+Iowa Hawkeyes,20,32,Michigan State Spartans
+Kansas State Wildcats,45,18,West Virginia Mountaineers
+North Texas Mean Green,44,52,Memphis Tigers
+UCF Knights,35,38,Iowa State Cyclones
+Arkansas State Red Wolves,44,28,Southern Miss Golden Eagles
+Ball State Cardinals,14,24,Vanderbilt Commodores
+LSU Tigers,34,10,Arkansas Razorbacks
+Texas A&M Aggies,34,24,Mississippi State Bulldogs
+Baylor Bears,59,35,Texas Tech Red Raiders
+Colorado Buffaloes,34,7,Arizona Wildcats
+James Madison,14,28,Georgia Southern
+New Mexico Lobos,50,45,Utah State Aggies
+USC Trojans,28,29,Maryland Terrapins
+Wyoming Cowboys,14,24,San Jose State Spartans
+Alabama Crimson Tide,17,24,Tennessee Volunteers
+Charlotte,17,51,Navy Midshipmen
+Florida Atlantic Owls,24,38,UTSA
+Hawaii Warriors,10,42,Washington State Cougars
+Houston Cougars,14,42,Kansas Jayhawks
+Kent State Golden Flashes,6,27,Bowling Green Falcons
+Michigan Wolverines,7,21,Illinois Fighting Illini
+NC State Wolfpack,24,23,Cal Golden Bears
+Notre Dame Fighting Irish,31,13,Georgia Tech Yellow Jackets
+Ohio Bobcats,20,30,Miami RedHawks
+Rice Owls,10,24,Tulane Green Wave
+Texas State Bobcats,14,24,Old Dominion
+Toledo Rockets,13,6,Northern Illinois Huskies
+UAB Blazers,25,35,South Florida Bulls
+Western Michigan Broncos,48,41,Buffalo Bulls
+Central Michigan Chippewas,34,38,Eastern Michigan Eagles
+Tulsa Golden Hurricane,10,20,Temple Owls
+South Carolina Gamecocks,35,9,Oklahoma Sooners
+Arizona State Sun Devils,14,24,Cincinnati Bearcats
+Auburn Tigers,17,21,Missouri Tigers
+East Carolina Pirates,28,45,Army Black Knight
+Louisiana-Lafayette Ragin' Cajuns,34,24,Coastal Carolina Chanticleers
+Miami Hurricanes,52,45,Louisville Cardinals
+Nebraska Cornhuskers,7,56,Indiana Hoosiers
+UCLA Bruins,35,32,Rutgers Scarlet Knights
+Virginia Cavaliers,31,48,Clemson Tigers
+Wake Forest Demon Deacons,23,20,Connecticut Huskies
+Wisconsin Badgers,23,3,Northwestern Wildcats
+Fresno State Bulldogs,24,21,Nevada Wolf Pack
+Oklahoma State Cowboys,35,38,Brigham Young Cougars
+Oregon Ducks,35,0,Purdue Boilermakers
+Florida State Seminoles,16,23,Duke Blue Devils
+Boston College Eagles,21,42,Virginia Tech Hokies
+Georgia State Panthers,20,35,Marshall Thundering Herd
+FIU Golden Panthers,21,30,UTEP Miners
+Western Kentucky Hilltoppers,31,14,Sam Houston State
+Louisiana Tech Bulldogs,30,33,New Mexico State Aggies
+Kennesaw State,5,14,Middle Tennessee St. Blue Raiders
+Troy Trojans,9,25,South Alabama
+Boise State Broncos,28,7,Hawaii Warriors
+Kansas State Wildcats,31,28,Colorado Buffaloes
+Minnesota Golden Gophers,21,17,UCLA Bruins
+Iowa State Cyclones,28,16,West Virginia Mountaineers
+Marshall Thundering Herd,23,24,Georgia Southern
+Syracuse Orange,24,17,NC State Wolfpack
+Vanderbilt Commodores,20,13,Kentucky Wildcats
+Appalachian State,24,34,Louisiana-Lafayette Ragin' Cajuns
+Ohio State Buckeyes,31,32,Oregon Ducks
+Ole Miss Rebles,26,29,LSU Tigers
+Oregon State Beavers,37,42,Nevada Wolf Pack
+Air Force Falcons,37,52,New Mexico Lobos
+Arkansas State Red Wolves,9,41,Texas State Bobcats
+Florida Gators,17,23,Tennessee Volunteers
+North Texas Mean Green,41,37,Florida Atlantic Owls
+UTSA,27,29,Rice Owls
+Washington State Cougars,25,17,Fresno State Bulldogs
+Southern Miss Golden Eagles,21,38,Louisiana-Monroe Warhawks
+Mississippi State Bulldogs,31,41,Georgia Bulldogs
+Arizona Wildcats,19,41,Brigham Young Cougars
+Ohio Bobcats,27,25,Central Michigan Chippewas
+Akron Zips,24,34,Western Michigan Broncos
+Cal Golden Bears,15,17,Pittsburgh Panthers
+Cincinnati Bearcats,19,13,UCF Knights
+Louisville Cardinals,24,20,Virginia Cavaliers
+Memphis Tigers,21,3,South Florida Bulls
+Northern Illinois Huskies,17,7,Bowling Green Falcons
+Old Dominion,21,14,Georgia State Panthers
+Penn State Nittany Lions,33,30,USC Trojans
+Purdue Boilermakers,49,50,Illinois Fighting Illini
+San Diego State Aztecs,27,24,Wyoming Cowboys
+San Jose State Spartans,24,31,Colorado State Rams
+Stanford Cardinal,7,49,Notre Dame Fighting Irish
+Texas Longhorns,34,3,Oklahoma Sooners
+Miami RedHawks,38,14,Eastern Michigan Eagles
+Ball State Cardinals,37,35,Kent State Golden Flashes
+Clemson Tigers,49,14,Wake Forest Demon Deacons
+Georgia Tech Yellow Jackets,41,34,North Carolina Tar Heels
+Missouri Tigers,45,3,UMass Minutemen
+South Carolina Gamecocks,25,27,Alabama Crimson Tide
+Toledo Rockets,15,30,Buffalo Bulls
+UAB Blazers,10,44,Army Black Knight
+Washington Huskies,16,40,Iowa Hawkeyes
+Wisconsin Badgers,42,7,Rutgers Scarlet Knights
+Utah Utes,19,27,Arizona State Sun Devils
+UNLV Rebels,50,34,Utah State Aggies
+Northwestern Wildcats,37,10,Maryland Terrapins
+Middle Tennessee St. Blue Raiders,21,48,Louisiana Tech Bulldogs
+UTEP Miners,17,44,Western Kentucky Hilltoppers
+Coastal Carolina Chanticleers,7,39,James Madison
+New Mexico State Aggies,13,54,Jacksonville State
+FIU Golden Panthers,24,31,Liberty Flames
+Texas Tech Red Raiders,28,22,Arizona Wildcats
+Miami Hurricanes,39,38,Cal Golden Bears
+Duke Blue Devils,14,24,Georgia Tech Yellow Jackets
+Hawaii Warriors,24,27,San Diego State Aztecs
+Kansas Jayhawks,31,35,Arizona State Sun Devils
+UCF Knights,13,24,Florida Gators
+Baylor Bears,21,43,Iowa State Cyclones
+Michigan Wolverines,17,27,Washington Huskies
+Nevada Wolf Pack,31,35,San Jose State Spartans
+Tennessee Volunteers,14,19,Arkansas Razorbacks
+USC Trojans,17,24,Minnesota Golden Gophers
+Clemson Tigers,29,13,Florida State Seminoles
+James Madison,19,21,Louisiana-Monroe Warhawks
+Louisiana-Lafayette Ragin' Cajuns,23,13,Southern Miss Golden Eagles
+Old Dominion,37,45,Coastal Carolina Chanticleers
+South Alabama,16,18,Arkansas State Red Wolves
+Utah State Aggies,30,62,Boise State Broncos
+Colorado State Rams,31,39,Oregon State Beavers
+Alabama Crimson Tide,35,40,Vanderbilt Commodores
+Rutgers Scarlet Knights,7,14,Nebraska Cornhuskers
+West Virginia Mountaineers,38,14,Oklahoma State Cowboys
+Appalachian State,37,52,Marshall Thundering Herd
+Auburn Tigers,13,31,Georgia Bulldogs
+Bowling Green Falcons,27,20,Akron Zips
+East Carolina Pirates,24,55,Charlotte
+Indiana Hoosiers,41,24,Northwestern Wildcats
+Iowa Hawkeyes,7,35,Ohio State Buckeyes
+Miami RedHawks,20,30,Toledo Rockets
+Ole Miss Rebles,27,3,South Carolina Gamecocks
+Temple Owls,20,29,Connecticut Huskies
+Virginia Tech Hokies,31,7,Stanford Cardinal
+Western Michigan Broncos,45,42,Ball State Cardinals
+Tulane Green Wave,71,20,UAB Blazers
+Army Black Knight,49,7,Tulsa Golden Hurricane
+Boston College Eagles,14,24,Virginia Cavaliers
+Missouri Tigers,10,41,Texas A&M Aggies
+Navy Midshipmen,34,7,Air Force Falcons
+Pittsburgh Panthers,34,24,North Carolina Tar Heels
+Purdue Boilermakers,6,52,Wisconsin Badgers
+SMU Mustangs,34,27,Louisville Cardinals
+UCLA Bruins,11,27,Penn State Nittany Lions
+UMass Minutemen,20,34,Northern Illinois Huskies
+Wake Forest Demon Deacons,34,30,NC State Wolfpack
+Michigan State Spartans,10,31,Oregon Ducks
+Syracuse Orange,44,41,UNLV Rebels
+Houston Cougars,30,19,TCU Horned Frogs
+Jacksonville State,63,24,Kennesaw State
+Sam Houston State,41,21,UTEP Miners
+Texas State Bobcats,38,17,Troy Trojans
+Oregon Ducks,34,13,UCLA Bruins
+Arizona Wildcats,23,10,Utah Utes
+Washington State Cougars,24,45,Boise State Broncos
+Air Force Falcons,19,31,Wyoming Cowboys
+Cincinnati Bearcats,41,44,Texas Tech Red Raiders
+Florida State Seminoles,16,42,SMU Mustangs
+New Mexico Lobos,50,40,New Mexico State Aggies
+South Alabama,10,42,LSU Tigers
+Georgia Bulldogs,34,41,Alabama Crimson Tide
+Illinois Fighting Illini,7,21,Penn State Nittany Lions
+Middle Tennessee St. Blue Raiders,7,24,Memphis Tigers
+Ohio State Buckeyes,38,7,Michigan State Spartans
+Charlotte,21,20,Rice Owls
+Iowa State Cyclones,20,0,Houston Cougars
+Louisiana-Monroe Warhawks,13,9,Troy Trojans
+Stanford Cardinal,14,40,Clemson Tigers
+Tulsa Golden Hurricane,20,52,North Texas Mean Green
+Louisiana Tech Bulldogs,10,17,FIU Golden Panthers
+UT Martin Skyhawks,24,13,Kennesaw State
+Wagner,10,41,Florida Atlantic Owls
+Old Dominion,30,27,Bowling Green Falcons
+Mississippi State Bulldogs,13,35,Texas Longhorns
+North Carolina Tar Heels,20,21,Duke Blue Devils
+UTSA,20,30,East Carolina Pirates
+Akron Zips,10,30,Ohio Bobcats
+Arkansas Razorbacks,17,21,Texas A&M Aggies
+Colorado Buffaloes,48,21,UCF Knights
+Eastern Michigan Eagles,52,33,Kent State Golden Flashes
+Fresno State Bulldogs,14,59,UNLV Rebels
+Georgia Southern,38,21,Georgia State Panthers
+Louisiana-Lafayette Ragin' Cajuns,41,38,Wake Forest Demon Deacons
+Louisville Cardinals,24,31,Notre Dame Fighting Irish
+Oklahoma Sooners,27,21,Auburn Tigers
+San Diego State Aztecs,21,22,Central Michigan Chippewas
+TCU Horned Frogs,38,27,Kansas Jayhawks
+UMass Minutemen,20,23,Miami RedHawks
+Western Michigan Broncos,20,27,Marshall Thundering Herd
+Wisconsin Badgers,21,38,USC Trojans
+Texas State Bobcats,39,40,Sam Houston State
+Ball State Cardinals,7,63,James Madison
+Brigham Young Cougars,34,28,Baylor Bears
+Buffalo Bulls,3,47,Connecticut Huskies
+Holy Cross Crusaders,14,42,Syracuse Orange
+Kentucky Wildcats,20,17,Ole Miss Rebles
+Maryland Terrapins,28,42,Indiana Hoosiers
+Minnesota Golden Gophers,24,27,Michigan Wolverines
+Navy Midshipmen,41,18,UAB Blazers
+Nebraska Cornhuskers,28,10,Purdue Boilermakers
+Northern Illinois Huskies,17,24,NC State Wolfpack
+Oklahoma State Cowboys,20,42,Kansas State Wildcats
+South Florida Bulls,10,45,Tulane Green Wave
+Western Kentucky Hilltoppers,20,21,Boston College Eagles
+Washington Huskies,18,21,Rutgers Scarlet Knights
+Virginia Tech Hokies,34,38,Miami Hurricanes
+Army Black Knight,42,14,Temple Owls
+Northern Iowa,7,36,Hawaii Warriors
+Kansas State Wildcats,9,38,Brigham Young Cougars
+Portland State,14,56,Boise State Broncos
+Fresno State Bulldogs,38,21,New Mexico Lobos
+Purdue Boilermakers,21,38,Oregon State Beavers
+Baylor Bears,31,38,Colorado Buffaloes
+Louisiana-Monroe Warhawks,3,51,Texas Longhorns
+Michigan State Spartans,19,23,Boston College Eagles
+Georgia Southern,13,52,Ole Miss Rebles
+Akron Zips,7,50,South Carolina Gamecocks
+Bowling Green Falcons,20,26,Texas A&M Aggies
+Iowa Hawkeyes,31,14,Minnesota Golden Gophers
+Tennessee Volunteers,25,15,Oklahoma Sooners
+Cal Golden Bears,9,14,Florida State Seminoles
+Florida A&M,12,34,Troy Trojans
+Florida Atlantic Owls,14,48,Connecticut Huskies
+Miami Hurricanes,50,15,South Florida Bulls
+New Mexico State Aggies,11,31,Sam Houston State
+Northwestern Wildcats,5,24,Washington Huskies
+Toledo Rockets,21,26,Western Kentucky Hilltoppers
+Tulsa Golden Hurricane,23,20,Louisiana Tech Bulldogs
+Wyoming Cowboys,17,44,North Texas Mean Green
+East Carolina Pirates,24,35,Liberty Flames
+Monmouth Hawks,45,42,FIU Golden Panthers
+TCU Horned Frogs,42,66,SMU Mustangs
+UTEP Miners,17,27,Colorado State Rams
+Vanderbilt Commodores,27,30,Missouri Tigers
+Duke Blue Devils,45,17,Middle Tennessee St. Blue Raiders
+Utah Utes,22,19,Oklahoma State Cowboys
+Arizona State Sun Devils,22,30,Texas Tech Red Raiders
+Arkansas Razorbacks,24,14,Auburn Tigers
+Buffalo Bulls,23,20,Northern Illinois Huskies
+Central Connecticut State,31,35,UMass Minutemen
+Georgia Tech Yellow Jackets,19,31,Louisville Cardinals
+Houston Christian,7,45,UTSA
+Kent State Golden Flashes,0,56,Penn State Nittany Lions
+Memphis Tigers,44,56,Navy Midshipmen
+Miami RedHawks,3,28,Notre Dame Fighting Irish
+Rutgers Scarlet Knights,26,23,Virginia Tech Hokies
+UCLA Bruins,17,34,LSU Tigers
+USC Trojans,24,27,Michigan Wolverines
+Youngstown State,17,73,Pittsburgh Panthers
+Southern Miss Golden Eagles,7,44,Jacksonville State
+Washington Eagles,16,49,Nevada Wolf Pack
+Arkansas State Red Wolves,7,52,Iowa State Cyclones
+St. Francis (PA),0,36,Eastern Michigan Eagles
+Utah State Aggies,29,45,Temple Owls
+Virginia Cavaliers,43,24,Coastal Carolina Chanticleers
+Ball State Cardinals,34,37,Central Michigan Chippewas
+Ohio Bobcats,6,41,Kentucky Wildcats
+Charlotte,14,52,Indiana Hoosiers
+Florida Gators,45,28,Mississippi State Bulldogs
+Houston Cougars,0,34,Cincinnati Bearcats
+James Madison,70,50,North Carolina Tar Heels
+Kansas Jayhawks,28,32,West Virginia Mountaineers
+Marshall Thundering Herd,14,49,Ohio State Buckeyes
+NC State Wolfpack,35,59,Clemson Tigers
+Rice Owls,14,37,Army Black Knight
+Tulane Green Wave,41,33,Louisiana-Lafayette Ragin' Cajuns
+Villanova Wildcats,20,38,Maryland Terrapins
+San Jose State Spartans,52,54,Washington State Cougars
+Illinois Fighting Illini,31,24,Nebraska Cornhuskers
+Stanford Cardinal,26,24,Syracuse Orange
+South Alabama,48,14,Appalachian State
+New Mexico State Aggies,0,48,Fresno State Bulldogs
+San Diego State Aztecs,10,31,Cal Golden Bears
+Brigham Young Cougars,34,14,Wyoming Cowboys
+Maryland Terrapins,27,13,Virginia Cavaliers
+Rice Owls,7,33,Houston Cougars
+Kent State Golden Flashes,0,71,Tennessee Volunteers
+Air Force Falcons,3,31,Baylor Bears
+Colorado Buffaloes,28,9,Colorado State Rams
+Eastern Illinois Panthers,7,31,Northwestern Wildcats
+Georgia Bulldogs,13,12,Kentucky Wildcats
+Indiana Hoosiers,42,13,UCLA Bruins
+New Mexico Lobos,19,45,Auburn Tigers
+Northern Iowa,3,34,Nebraska Cornhuskers
+Toledo Rockets,41,17,Mississippi State Bulldogs
+UCF Knights,35,34,TCU Horned Frogs
+Hawaii Warriors,13,31,Sam Houston State
+Jacksonville State,34,37,Eastern Michigan Eagles
+Kennesaw State,10,31,San Jose State Spartans
+South Florida Bulls,49,24,Southern Miss Golden Eagles
+UTSA,7,56,Texas Longhorns
+Vanderbilt Commodores,32,36,Georgia State Panthers
+Western Kentucky Hilltoppers,49,21,Middle Tennessee St. Blue Raiders
+Bethune Cookman,31,59,Western Michigan Broncos
+Ole Miss Rebles,40,6,Wake Forest Demon Deacons
+Colgate R.,20,31,Akron Zips
+Connecticut Huskies,21,26,Duke Blue Devils
+FIU Golden Panthers,20,38,Florida Atlantic Owls
+Gardner-Webb,26,27,Charlotte
+North Carolina Central Eagles,10,45,North Carolina Tar Heels
+South Carolina State,14,42,Georgia Southern
+UTEP Miners,10,28,Liberty Flames
+Virginia Tech Hokies,37,17,Old Dominion
+Utah Utes,38,21,Utah State Aggies
+UAB Blazers,27,37,Arkansas Razorbacks
+Appalachian State,21,19,East Carolina Pirates
+Troy Trojans,21,38,Iowa Hawkeyes
+Ball State Cardinals,0,62,Miami Hurricanes
+Morgan State,6,21,Ohio Bobcats
+Nevada Wolf Pack,0,27,Minnesota Golden Gophers
+Notre Dame Fighting Irish,66,7,Purdue Boilermakers
+Oregon Ducks,49,14,Oregon State Beavers
+Prairie V.,0,40,Michigan State Spartans
+Texas A&M Aggies,33,20,Florida Gators
+Tulane Green Wave,19,34,Oklahoma Sooners
+VMI,7,59,Georgia Tech Yellow Jackets
+Washington State Cougars,24,19,Washington Huskies
+West Virginia Mountaineers,34,38,Pittsburgh Panthers
+Coastal Carolina Chanticleers,28,20,Temple Owls
+UMass Minutemen,3,34,Buffalo Bulls
+Boston College Eagles,21,27,Missouri Tigers
+Alabama Crimson Tide,42,10,Wisconsin Badgers
+Arkansas State Red Wolves,18,28,Michigan Wolverines
+Central Michigan Chippewas,9,30,Illinois Fighting Illini
+Cincinnati Bearcats,27,16,Miami RedHawks
+Louisiana Tech Bulldogs,20,30,NC State Wolfpack
+LSU Tigers,36,33,South Carolina Gamecocks
+Memphis Tigers,20,12,Florida State Seminoles
+North Texas Mean Green,21,66,Texas Tech Red Raiders
+Oklahoma State Cowboys,45,10,Tulsa Golden Hurricane
+Arizona Wildcats,7,31,Kansas State Wildcats
+UNLV Rebels,23,20,Kansas Jayhawks
+Arizona State Sun Devils,31,28,Texas State Bobcats
+Northwestern State,10,87,South Alabama
+Utah State Aggies,0,48,USC Trojans
+Mississippi State Bulldogs,23,30,Arizona State Sun Devils
+Oregon State Beavers,21,0,San Diego State Aztecs
+Liberty Flames,30,24,New Mexico State Aggies
+Boise State Broncos,34,37,Oregon Ducks
+CS Sacramento,30,46,Fresno State Bulldogs
+Northern Arizona,10,22,Arizona Wildcats
+Texas Tech Red Raiders,16,37,Washington State Cougars
+Southern Utah,27,24,UTEP Miners
+Appalachian State,20,66,Clemson Tigers
+LIU Sharks,0,45,TCU Horned Frogs
+Houston Cougars,12,16,Oklahoma Sooners
+Alcorn State,0,55,Vanderbilt Commodores
+Colorado Buffaloes,10,28,Nebraska Cornhuskers
+Nicholls State,21,44,LSU Tigers
+Stephen F. Austin,20,35,North Texas Mean Green
+Tennessee Volunteers,51,10,NC State Wolfpack
+Western Michigan Broncos,0,56,Ohio State Buckeyes
+Buffalo Bulls,0,38,Missouri Tigers
+Cal Poly Mustangs,7,41,Stanford Cardinal
+Chattanooga,21,24,Georgia State Panthers
+Eastern Kentucky,0,31,Western Kentucky Hilltoppers
+Georgia Southern,20,17,Nevada Wolf Pack
+Kansas Jayhawks,17,23,Illinois Fighting Illini
+Louisiana-Lafayette Ragin' Cajuns,34,10,Kennesaw State
+Northern Colorado,17,38,Colorado State Rams
+Samford Bulldogs,7,45,Florida Gators
+San Jose State Spartans,17,7,Air Force Falcons
+South Florida Bulls,16,42,Alabama Crimson Tide
+Southeastern Louisiana,10,35,Southern Miss Golden Eagles
+Texas Southern,7,69,Rice Owls
+Tulsa Golden Hurricane,24,28,Arkansas State Red Wolves
+UAB Blazers,6,32,Louisiana-Monroe Warhawks
+Virginia Cavaliers,31,30,Wake Forest Demon Deacons
+William & Mary Tribe,21,40,Coastal Carolina Chanticleers
+Sam Houston State,14,45,UCF Knights
+Albany,14,49,West Virginia Mountaineers
+Central Michigan Chippewas,16,52,FIU Golden Panthers
+East Carolina Pirates,20,14,Old Dominion
+Florida A&M,9,56,Miami Hurricanes
+Gardner-Webb,6,13,James Madison
+South Alabama,20,27,Ohio Bobcats
+Marshall Thundering Herd,14,31,Virginia Tech Hokies
+Middle Tennessee St. Blue Raiders,3,52,Ole Miss Rebles
+UTSA,10,49,Texas State Bobcats
+Baylor Bears,12,23,Utah Utes
+Cal Golden Bears,21,14,Auburn Tigers
+Charlotte,20,38,North Carolina Tar Heels
+Duquesne D.,0,56,Boston College Eagles
+Eastern Michigan Eagles,9,30,Washington Huskies
+Idaho Vandals,17,13,Wyoming Cowboys
+Iowa State Cyclones,20,19,Iowa Hawkeyes
+Jacksonville State,14,49,Louisville Cardinals
+Michigan State Spartans,27,24,Maryland Terrapins
+Northern Illinois Huskies,16,14,Notre Dame Fighting Irish
+South Carolina Gamecocks,31,6,Kentucky Wildcats
+South Dakota Coyotes,13,27,Wisconsin Badgers
+Temple Owls,11,38,Navy Midshipmen
+UMass Minutemen,23,38,Toledo Rockets
+Utah Tech,14,72,UNLV Rebels
+St. Francis (PA),23,17,Kent State Golden Flashes
+Missouri State,34,42,Ball State Cardinals
+Tennessee Tech Golden Eagles,3,48,Georgia Bulldogs
+McNeese,10,52,Texas A&M Aggies
+Akron Zips,17,49,Rutgers Scarlet Knights
+Arkansas Razorbacks,31,39,Oklahoma State Cowboys
+Army Black Knight,24,7,Florida Atlantic Owls
+Bowling Green Falcons,27,34,Penn State Nittany Lions
+Georgia Tech Yellow Jackets,28,31,Syracuse Orange
+Kansas State Wildcats,34,27,Tulane Green Wave
+Merrimack Warriors,17,63,Connecticut Huskies
+Pittsburgh Panthers,28,27,Cincinnati Bearcats
+Rhode Island,0,48,Minnesota Golden Gophers
+Texas Longhorns,31,12,Michigan Wolverines
+Troy Trojans,17,38,Memphis Tigers
+Duke Blue Devils,26,20,Northwestern Wildcats
+Brigham Young Cougars,18,15,SMU Mustangs
+Western Illinois,3,77,Indiana Hoosiers
+Boston College Eagles,28,13,Florida State Seminoles
+USC Trojans,27,20,LSU Tigers
+Weber State,3,35,Washington Huskies
+New Mexico Lobos,39,61,Arizona Wildcats
+Wyoming Cowboys,7,48,Arizona State Sun Devils
+Southeast Missouri St,16,23,New Mexico State Aggies
+Georgia State Panthers,12,35,Georgia Tech Yellow Jackets
+Grambling State,10,40,Louisiana-Lafayette Ragin' Cajuns
+Houston Christian,7,59,SMU Mustangs
+James Madison,30,7,Charlotte
+Lamar,27,34,Texas State Bobcats
+Nicholls State,17,25,Louisiana Tech Bulldogs
+Robert Morris,14,36,Utah State Aggies
+Southern Illinois,13,41,Brigham Young Cougars
+Texas A&M Comm.,14,45,San Diego State Aztecs
+Southern Miss Golden Eagles,0,31,Kentucky Wildcats
+Abilene,51,52,Texas Tech Red Raiders
+Alabama A&M,3,73,Auburn Tigers
+Fresno State Bulldogs,10,30,Michigan Wolverines
+Idaho Vandals,14,24,Oregon Ducks
+Notre Dame Fighting Irish,23,13,Texas A&M Aggies
+UCLA Bruins,16,13,Hawaii Warriors
+Bethune Cookman,3,48,South Florida Bulls
+Central Arkansas,31,34,Arkansas State Red Wolves
+Furman,0,76,Ole Miss Rebles
+Nevada Wolf Pack,28,26,Troy Trojans
+North Alabama,0,40,Memphis Tigers
+Sam Houston State,34,14,Rice Owls
+Tarleton State,3,45,Baylor Bears
+Tennessee Tech Golden Eagles,25,32,Middle Tennessee St. Blue Raiders
+UNLV Rebels,27,7,Houston Cougars
+UT Martin Skyhawks,6,41,Kansas State Wildcats
+Western Kentucky Hilltoppers,0,63,Alabama Crimson Tide
+Idaho State,15,38,Oregon State Beavers
+Campbell Univ.,24,41,Liberty Flames
+Eastern Kentucky,7,56,Mississippi State Bulldogs
+Norfolk State,3,42,East Carolina Pirates
+Richmond Spiders,13,34,Virginia Cavaliers
+North Texas Mean Green,52,38,South Alabama
+Stony Brook,3,45,Marshall Thundering Herd
+UC Davis,13,31,Cal Golden Bears
+Old Dominion,19,23,South Carolina Gamecocks
+Boise State Broncos,56,45,Georgia Southern
+Akron Zips,6,52,Ohio State Buckeyes
+Colorado State Rams,0,52,Texas Longhorns
+East Ten. State,10,38,Appalachian State
+Eastern Michigan Eagles,28,14,UMass Minutemen
+FIU Golden Panthers,7,31,Indiana Hoosiers
+Kennesaw State,16,28,UTSA
+Merrimack Warriors,6,21,Air Force Falcons
+Miami Hurricanes,41,17,Florida Gators
+Miami RedHawks,6,13,Northwestern Wildcats
+North Dakota,3,21,Iowa State Cyclones
+Ohio Bobcats,22,38,Syracuse Orange
+UTEP Miners,7,40,Nebraska Cornhuskers
+Western Illinois,15,54,Northern Illinois Huskies
+Portland State,30,70,Washington State Cougars
+Towson Tigers,20,38,Cincinnati Bearcats
+South Dakota State,20,44,Oklahoma State Cowboys
+Chattanooga,3,69,Tennessee Volunteers
+Austin Peay Governors,0,62,Louisville Cardinals
+Bucknell,21,49,Navy Midshipmen
+Clemson Tigers,3,34,Georgia Bulldogs
+Connecticut Huskies,7,50,Maryland Terrapins
+Illinois State,0,40,Iowa Hawkeyes
+Indiana State,0,49,Purdue Boilermakers
+Kent State Golden Flashes,24,55,Pittsburgh Panthers
+Penn State Nittany Lions,34,12,West Virginia Mountaineers
+Virginia Tech Hokies,27,34,Vanderbilt Commodores
+TCU Horned Frogs,34,27,Stanford Cardinal
+Western Michigan Broncos,14,28,Wisconsin Badgers
+Elon Phoenix,3,26,Duke Blue Devils
+Florida Atlantic Owls,10,16,Michigan State Spartans
+Temple Owls,3,51,Oklahoma Sooners
+Lehigh Mountain Hawks,7,42,Army Black Knight
+CS Sacramento,24,42,San Jose State Spartans
+Eastern Illinois Panthers,0,45,Illinois Fighting Illini
+Southern Utah,0,49,Utah Utes
+Alcorn State,3,41,UAB Blazers
+Coastal Carolina Chanticleers,55,27,Jacksonville State
+Lindenwood Lions,3,48,Kansas Jayhawks
+Murray State Racers,0,51,Missouri Tigers
+North Carolina Tar Heels,19,17,Minnesota Golden Gophers
+North Dakota State,26,31,Colorado Buffaloes
+Northwestern State,28,62,Tulsa Golden Hurricane
+Southeastern Louisiana,0,52,Tulane Green Wave
+Arkansas-Pine B.,0,70,Arkansas Razorbacks
+Duquesne D.,10,49,Toledo Rockets
+Central Connecticut State,10,66,Central Michigan Chippewas
+Fordham,17,41,Bowling Green Falcons
+Jackson State,14,30,Louisiana-Monroe Warhawks
+Lafayette Leopards,13,30,Buffalo Bulls
+N. Carolina A&T,13,45,Wake Forest Demon Deacons
+New Hampshire,3,57,UCF Knights
+Western Carolina Catamounts,21,38,NC State Wolfpack
+Howard Bison,7,44,Rutgers Scarlet Knights
+Delaware State Hornets,14,35,Hawaii Warriors
+SMU Mustangs,29,24,Nevada Wolf Pack
+Montana,35,31,New Mexico Lobos
+Florida State Seminoles,21,24,Georgia Tech Yellow Jackets
