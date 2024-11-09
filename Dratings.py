@@ -12,6 +12,7 @@ from fuzzywuzzy import process
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from pandas import json_normalize
+from datetime import datetime, timedelta, date
 
 
 def get_closest_match(team_name, choices, threshold=70):
@@ -80,7 +81,7 @@ def dratings_cbb():
             team_a = teams[0].get_text()
             team_b = teams[1].get_text()
 
-            percentages = data[3].find_all('span')
+            percentages = data[2].find_all('span')
             team_a_per = float(percentages[0].get_text().replace('%', "")) / 100
             team_b_per = float(percentages[1].get_text().replace('%', "")) / 100
 
@@ -196,7 +197,7 @@ def calculate_ev(model_prob, vegas_prob):
     
     return ev
 
-def merge_dratings_and_odds(dratings_df, odds_df):
+def merge_dratings_and_odds(dratings_df, odds_df, sports):
     """
     Merge the dratings DataFrame with the odds DataFrame on date, home team, and away team names.
     
@@ -218,25 +219,123 @@ def merge_dratings_and_odds(dratings_df, odds_df):
     # Loop through each row in the odds DataFrame
     for idx, odds_row in odds_df.iterrows():
         # Find closest match for home team and away team in the dratings data
-        closest_home_team = get_closest_match(odds_row['Home Name'], dratings_df['home_team'])
-        closest_away_team = get_closest_match(odds_row['Away Name'], dratings_df['away_team'])
+        closest_home_team = get_closest_match(odds_row['Home Name'], dratings_df['home_team'].unique())
+        closest_away_team = get_closest_match(odds_row['Away Name'], dratings_df['away_team'].unique())
 
-        # Find matching row in dratings DataFrame
-        match_row = dratings_df[
-            (dratings_df['home_team'] == closest_home_team) &
-            (dratings_df['away_team'] == closest_away_team) &
-            (dratings_df['date'] == odds_row['Date'])
-        ]
+        # Proceed only if both teams have a valid match
+        if closest_home_team and closest_away_team:
+            # Find matching row in dratings DataFrame
+            match_row = dratings_df[
+                (dratings_df['home_team'] == closest_home_team) &
+                (dratings_df['away_team'] == closest_away_team)
+            ]
 
-        # If a matching row is found, merge the rows
-        if not match_row.empty:
-            combined_row = odds_row.to_dict()  # Convert odds row to a dictionary
-            combined_row.update(match_row.iloc[0].to_dict())  # Update with dratings data
-            merged_data.append(combined_row)  # Append combined data to the list
+            # If a matching row is found, merge the rows
+            if not match_row.empty:
+                combined_row = odds_row.to_dict()  # Convert odds row to a dictionary
+                combined_row.update(match_row.iloc[0].to_dict())  # Update with dratings data
+                merged_data.append(combined_row)  # Append combined data to the list
 
     # Convert the list of dictionaries to a DataFrame
     merged_df = pd.DataFrame(merged_data)
-    
+
+    merged_df['Date'] = (datetime.today() + timedelta(days=0)).strftime('%Y-%m-%d')
+
+    # Reorder columns to place 'Date' as the first column
+    columns = ['Date'] + [col for col in merged_df.columns if col != 'Date']
+    merged_df = merged_df[columns]
+
+    cols_to_convert = ['Home MoneyLine', 'Away MoneyLine']
+
+    for col in cols_to_convert:
+        merged_df[col] = merged_df[col].apply(moneyline_to_proba)
+
+    merged_df['away_team_percentage'] = merged_df['away_team_percentage'].astype(float)
+    merged_df['home_team_percentage'] = merged_df['home_team_percentage'].astype(float)
+
+    merged_df['away_team_percentage'] = pd.to_numeric(merged_df['away_team_percentage'], errors='coerce')
+
+    merged_df['home_team_percentage'] = pd.to_numeric(merged_df['home_team_percentage'], errors='coerce')
+
+    merged_df['away_team_percentage'] = round(merged_df['away_team_percentage'], 3)
+    merged_df['home_team_percentage'] = round(merged_df['home_team_percentage'], 3)
+
+    merged_df['Away EV'] = merged_df.apply(lambda x: calculate_ev(x['away_team_percentage'], x['Away MoneyLine']), axis=1)
+
+    # Calculate Expected Value (EV) for Home Team
+    merged_df['Home EV'] = merged_df.apply(lambda x: calculate_ev(x['home_team_percentage'], x['Home MoneyLine']), axis=1)
+
+    merged_df['away_team_percentage'] = round(merged_df['away_team_percentage'] * 100,1)
+
+    merged_df['home_team_percentage'] = round(merged_df['home_team_percentage'] * 100,1)
+
+    merged_df['Home EV'] = merged_df['Home EV'] * 100
+
+    merged_df['Home EV'] = round(merged_df['Home EV'], 1)
+
+    merged_df['Away EV'] = merged_df['Away EV'] * 100
+
+    merged_df['Away EV'] = round(merged_df['Away EV'], 1)
+
+    merged_df = merged_df[
+        ['Home Name', 'Away Name','home_team_percentage', 'away_team_percentage','Home EV','Away EV']]
+
+    if sports == "NHL" :
+        # Use credentials to create a client to interact with the Google Drive API
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+        client = gspread.authorize(creds)
+
+        # Open the spreadsheet by its key
+        spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+        spreadsheet = client.open_by_key(spreadsheet_id)
+
+        sheet_name = 'Dratings'
+        
+        # Select the first sheet
+        sheet = spreadsheet.worksheet(sheet_name)
+
+        # Clear existing data
+        #sheet.clear()
+
+        # Append headers if the first row is empty
+        if not sheet.row_values(1):
+            sheet.append_row(merged_df.columns.tolist())  # Add headers
+
+        # Convert DataFrame to a list of lists for the data rows
+        data = merged_df.values.tolist()
+
+        # Append the data rows to the sheet
+        sheet.append_rows(data)  # Efficiently append the rows
+
+    if sports == "NCAAB" :
+        # Use credentials to create a client to interact with the Google Drive API
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+        client = gspread.authorize(creds)
+
+        # Open the spreadsheet by its key
+        spreadsheet_id = '1KwURGRKr6iMgTTWK7mxev4ViUsxrhJE803ieCyB9Asw'
+        spreadsheet = client.open_by_key(spreadsheet_id)
+
+        sheet_name = 'Dratings'
+        
+        # Select the first sheet
+        sheet = spreadsheet.worksheet(sheet_name)
+
+        # Clear existing data
+        #sheet.clear()
+
+        # Append headers if the first row is empty
+        if not sheet.row_values(1):
+            sheet.append_row(merged_df.columns.tolist())  # Add headers
+
+        # Convert DataFrame to a list of lists for the data rows
+        data = merged_df.values.tolist()
+
+        # Append the data rows to the sheet
+        sheet.append_rows(data)  # Efficiently append the rows
+        
     return merged_df
 
 def convert_to_dataframe(data):
@@ -245,11 +344,16 @@ def convert_to_dataframe(data):
     return df
 
 def main():
+    sports = "NCAAB"
     date = datetime.today().date()
     print(date)
 
-    nhl_odds_df = fetch_odds_data(date, True, "NHL")
-    nhl_dratings_df = convert_to_dataframe(dratings_nhl())
+    nhl_odds_df = fetch_odds_data(date, True, sports)
+    if sports == "NHL":
+        nhl_dratings_df = convert_to_dataframe(dratings_nhl())
+    if sports == "NCAAB":
+        nhl_dratings_df = convert_to_dataframe(dratings_cbb())
+        
 
     # Save nhl_odds_df to CSV if it's not None
     if nhl_odds_df is not None:
@@ -261,7 +365,7 @@ def main():
     if not nhl_dratings_df_df.empty:
         nhl_dratings_df_df.to_csv(f"nhl_dratings_{date}.csv", index=False)
         print(f"nhl_dratings_{date}.csv saved successfully.")
-        merged_df = merge_dratings_and_odds(nhl_dratings_df, nhl_odds_df)
+        merged_df = merge_dratings_and_odds(nhl_dratings_df, nhl_odds_df,sports)
         merged_df.to_csv(f"nhl_merged_{date}.csv", index=False)
         print(f"nhl_merged_{date}.csv saved successfully.")
 
