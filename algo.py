@@ -17,6 +17,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import csv
 import re
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # Create a dictionary to map team abbreviations to full names
 team_name_mapping = {
@@ -1135,6 +1137,7 @@ def prepare_team_data(row, team_type='Home', historical_games=None):
 
 def main():
     date = datetime.today().date()
+    today = date.today().strftime("%Y-%m-%d")
     sports = "NHL"
     espn_df = espn_nhl()
     # Map team abbreviations to full names
@@ -1171,6 +1174,37 @@ def main():
     predictions_df = pd.DataFrame(predictions)
     predictions_df.to_csv(f"predictions_{date}.csv", index=False)
     print(predictions_df)
+    predictions_df.drop('Details', axis=1, inplace=True)
+    predictions_df.drop('Date', axis=1, inplace=True)
+    predictions_df.insert(0, 'Date', today)
+
+    if sports == "NHL" :
+        # Use credentials to create a client to interact with the Google Drive API
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+        client = gspread.authorize(creds)
+
+        # Open the spreadsheet by its key
+        spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+        spreadsheet = client.open_by_key(spreadsheet_id)
+
+        sheet_name = 'Oracle'
+        
+        # Select the first sheet
+        sheet = spreadsheet.worksheet(sheet_name)
+
+        # Clear existing data
+        #sheet.clear()
+
+        # Append headers if the first row is empty
+        if not sheet.row_values(1):
+            sheet.append_row(predictions_df.columns.tolist())  # Add headers
+
+        # Convert DataFrame to a list of lists for the data rows
+        data = predictions_df.values.tolist()
+
+        # Append the data rows to the sheet
+        sheet.append_rows(data)  # Efficiently append the rows
 
 if __name__ == '__main__':
     main()
