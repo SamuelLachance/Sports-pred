@@ -1146,6 +1146,16 @@ def calculate_average_points(team_name, historical_games):
     }
 
 def calculate_win_loss_streaks(team_name, historical_games):
+    """
+    Calculate the current win/loss streaks for a team overall, at home, and away.
+
+    Parameters:
+        team_name (str): The name of the team.
+        historical_games (pd.DataFrame): DataFrame containing historical game data.
+
+    Returns:
+        dict: Dictionary containing current overall streak, home streak, and away streak.
+    """
     # Sort games by date in descending order
     team_games = historical_games[
         (historical_games['Home Team'] == team_name) | (historical_games['Away Team'] == team_name)
@@ -1244,7 +1254,7 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
             'record_points': 0,                    # Metric 1
             'home_away_record': 0,                 # Metric 2
             'home_away_10_game_records': 0,        # Metric 3
-            'last_10_games': 0,                     # Metric 4
+            'last_10_games': 0,                    # Metric 4
             'avg_game_points': 0,                  # Metric 5
             'avg_points_10_games': 0,              # Metric 6
             'win_loss_streaks_against': 0,         # Metric 7
@@ -1461,12 +1471,13 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
         team_data['avg_game_points'] = 0
         team_data['avg_points_10_games'] = 0
 
-    # 7) Win_streak = number of consecutive wins
-    # 8) Win_streak_home_away = number of consecutive wins home or away
+    # 7) Win_loss_streaks_against = current_home_streak or current_away_streak based on team_type
     if historical_games is not None:
         streak_data = calculate_win_loss_streaks(team_name, historical_games)
-        team_data['win_loss_streaks_against'] = streak_data['current_streak']  # Metric 7
-        # You can add home and away streaks if needed
+        if team_type == 'Home':
+            team_data['win_loss_streaks_against'] = streak_data['current_home_streak']  # Home-specific streak
+        else:
+            team_data['win_loss_streaks_against'] = streak_data['current_away_streak']  # Away-specific streak
     else:
         team_data['win_loss_streaks_against'] = 0  # Metric 7
 
@@ -1474,7 +1485,12 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
     if sport == "NHL":
         if record:
             try:
-                wins, losses, otl = map(int, record.split('-'))
+                record_parts = record.split('-')
+                if len(record_parts) >= 3:
+                    wins, losses, otl = map(int, record_parts[:3])
+                else:
+                    wins, losses = map(int, record_parts[:2])
+                    otl = 0
                 total_games = wins + losses + otl
                 current_win_ratio = wins / total_games if total_games > 0 else 0
                 team_data['current_win_ratio'] = current_win_ratio
@@ -1508,7 +1524,7 @@ def safe_to_lower(text):
 def main():
     date = datetime.today().date()
     today_str = datetime.today().strftime("%Y-%m-%d")
-    sports = "NBA"  # Change to "NHL" as needed
+    sports = "NHL"  # Change to "NHL" as needed
     days = 30
 
     # Select the appropriate team name mapping
