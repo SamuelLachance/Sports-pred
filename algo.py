@@ -1058,13 +1058,10 @@ def fetch_recent_games(days=30, sports="NHL"):
 
     for day_offset in range(days):
         date = today - timedelta(days=day_offset)
-        # Ensure the date is not in the future
-        if date > today:
-            continue
-
         formatted_date = date.strftime('%Y%m%d')
         url = f"http://site.api.espn.com/apis/site/v2/sports/{sport_url_part}/scoreboard?dates={formatted_date}"
         response = requests.get(url)
+        
         if response.status_code == 200:
             data = response.json()
             events = data.get('events', [])
@@ -1073,9 +1070,11 @@ def fetch_recent_games(days=30, sports="NHL"):
                 competition = event.get('competitions', [])[0]
                 game['Date'] = event.get('date', '').split('T')[0]
                 competitors = competition.get('competitors', [])
+                
                 if len(competitors) == 2:
                     home_team = next((team for team in competitors if team['homeAway'] == 'home'), None)
                     away_team = next((team for team in competitors if team['homeAway'] == 'away'), None)
+                    
                     if home_team and away_team:
                         game['Home Team'] = home_team['team']['displayName']
                         game['Away Team'] = away_team['team']['displayName']
@@ -1085,7 +1084,13 @@ def fetch_recent_games(days=30, sports="NHL"):
         else:
             print(f"Failed to fetch games for date: {formatted_date}")
 
-    return pd.DataFrame(recent_games)
+    games_df = pd.DataFrame(recent_games)
+    # Convert 'Date' column to datetime to ensure no future dates are included
+    games_df['Date'] = pd.to_datetime(games_df['Date'])
+    # Filter out any entries with a date that is somehow in the future
+    games_df = games_df[games_df['Date'] <= pd.Timestamp.today().normalize()]
+
+    return games_df
 
 def calculate_average_points(team_name, historical_games):
     # Filter games involving the team
@@ -1503,7 +1508,7 @@ def safe_to_lower(text):
 def main():
     date = datetime.today().date()
     today_str = datetime.today().strftime("%Y-%m-%d")
-    sports = "NHL"  # Change to "NHL" as needed
+    sports = "NBA"  # Change to "NHL" as needed
     days = 30
 
     # Select the appropriate team name mapping
