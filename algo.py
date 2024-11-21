@@ -80,6 +80,7 @@ nba_team_name_mapping = {
     'DEN': 'Denver Nuggets',
     'DET': 'Detroit Pistons',
     'GSW': 'Golden State Warriors',
+    'GS': 'Golden State Warriors',
     'HOU': 'Houston Rockets',
     'IND': 'Indiana Pacers',
     'LAC': 'Los Angeles Clippers',
@@ -89,6 +90,7 @@ nba_team_name_mapping = {
     'MIL': 'Milwaukee Bucks',
     'MIN': 'Minnesota Timberwolves',
     'NOP': 'New Orleans Pelicans',
+    'NO': 'New Orleans Pelicans',
     'NYK': 'New York Knicks',
     'OKC': 'Oklahoma City Thunder',
     'ORL': 'Orlando Magic',
@@ -97,9 +99,12 @@ nba_team_name_mapping = {
     'POR': 'Portland Trail Blazers',
     'SAC': 'Sacramento Kings',
     'SAS': 'San Antonio Spurs',
+    'SAN': 'San Antonio Spurs',
+    'SA': 'San Antonio Spurs',
     'TOR': 'Toronto Raptors',
     'UTA': 'Utah Jazz',
-    'WAS': 'Washington Wizards',
+    'UTAH': 'Utah Jazz',
+    'WSH': 'Washington Wizards',
 }
 
 class Algo:
@@ -127,14 +132,13 @@ class Algo:
 
 	#returns algo results
 	def calculate(self, date, returned1, returned2):
-		record_points             =self.calculate_points("seasonal_records",          returned1['seasonal_records'],         returned2['seasonal_records'])
-		home_away_points          =self.calculate_points("home_away_records",         returned1['home_away_record'],         returned2['home_away_record'])
-		home_away_10_games_points =self.calculate_points("home_away_10_game_records", returned1['home_away_record'],         returned2['home_away_record'])
-		last_10_games_points      =self.calculate_points("last_10_games",             returned1['current_win_ratio'],        returned2['current_win_ratio'])
-		avg_points                =self.calculate_points("avg_points",                returned1['avg_game_points'],          returned2['avg_game_points'])
-		avg_points_10_games       =self.calculate_points("avg_points_10_games",       returned1['avg_game_points'],          returned2['avg_game_points'])
-		win_streak                =self.calculate_points("win_streak",                returned1['win_loss_streaks_against'], returned2['win_loss_streaks_against'])
-		win_streak_home_away      =self.calculate_points("win_streak_home_away",      returned1['win_loss_streaks_against'], returned2['win_loss_streaks_against'])
+		record_points             =self.calculate_points("seasonal_records",          returned1['seasonal_records'],  returned2['seasonal_records'])
+		home_away_points          =self.calculate_points("home_away_records",         returned1['home_away_record'],  returned2['home_away_record'])
+		home_away_10_games_points =self.calculate_points("home_away_10_game_records", returned1['home_away_10_game_records'],  returned2['home_away_10_game_records'])
+		last_10_games_points      =self.calculate_points("last_10_games",             returned1['last_10_games'], returned2['last_10_games'])
+		avg_points                =self.calculate_points("avg_points",                returned1['avg_points'],   returned2['avg_points'])
+		avg_points_10_games       =self.calculate_points("avg_points_10_games",       returned1['avg_points_10_games'],   returned2['avg_points_10_games'])
+		win_streak_home_away      =self.calculate_points("win_streak_home_away",      returned1['win_streak_home_away'], returned2['win_streak_home_away'])
 
 
 		# print(self.algorithm)
@@ -153,8 +157,6 @@ class Algo:
 		if self.algorithm[self.league][5]<0:
 			avg_points_10_games=       0
 		if self.algorithm[self.league][6]<0:
-			win_streak=                0
-		if self.algorithm[self.league][7]<0:
 			win_streak_home_away=      0
 
 
@@ -165,8 +167,7 @@ class Algo:
 		last_10_games_points      /=    self.algorithm[self.league][3]
 		avg_points                /=    self.algorithm[self.league][4]
 		avg_points_10_games       /=    self.algorithm[self.league][5]
-		win_streak                /=    self.algorithm[self.league][6]
-		win_streak_home_away      /=    self.algorithm[self.league][7]
+		win_streak_home_away      /=    self.algorithm[self.league][6]
 
 
 
@@ -184,7 +185,7 @@ class Algo:
 
 
 
-		total=record_points + home_away_points + home_away_10_games_points + last_10_games_points + avg_points + avg_points_10_games + win_streak + win_streak_home_away
+		total=record_points + home_away_points + home_away_10_games_points + last_10_games_points + avg_points + avg_points_10_games + win_streak_home_away
 
 		# #always has home team win
 		# total=-1
@@ -201,7 +202,6 @@ class Algo:
 		to_return['last_10_games_points']=      last_10_games_points
 		to_return['avg_points']=                avg_points
 		to_return['avg_points_10_games']=       avg_points_10_games
-		to_return['win_streak']=                win_streak
 		to_return['win_streak_home_away']=      win_streak_home_away
 		to_return['total']=                     total
 		return to_return
@@ -685,6 +685,8 @@ class Algo:
 
 		return points
 
+# ... [Previous code including class Algo remains unchanged] ...
+
 def get_closest_match(team_name, choices, threshold=70):
     match, score = process.extractOne(team_name, choices)
     return match if score >= threshold else None
@@ -747,10 +749,10 @@ def espn_standings(sport="NHL"):
                             otl = "0"
 
                         pts_stat = stat_names.get("points")
-                        pts = pts_stat["value"] if pts_stat else None
+                        pts = pts_stat["value"] if pts_stat else 0
 
                         GP_stat = stat_names.get("gamesPlayed")
-                        GP = GP_stat["value"] if GP_stat else None
+                        GP = GP_stat["value"] if GP_stat else 0
 
                         streak_stat = stat_names.get("streak")
                         streak = streak_stat["displayValue"] if streak_stat else "None"
@@ -779,6 +781,7 @@ def espn_standings(sport="NHL"):
                         'away_record': away_record,
                         'last_ten_record': last_ten_record
                     })
+                    print(name)
 
                 elif sport == "NBA":
                     # Extract NBA-specific statistics
@@ -795,13 +798,13 @@ def espn_standings(sport="NHL"):
                             losses = "0"
 
                         wins_stat = stat_names.get("wins")
-                        wins_value = wins_stat["value"] if wins_stat else None
+                        wins_value = wins_stat["value"] if wins_stat else 0
 
                         losses_stat = stat_names.get("losses")
-                        losses_value = losses_stat["value"] if losses_stat else None
+                        losses_value = losses_stat["value"] if losses_stat else 0
 
                         win_percent_stat = stat_names.get("winpercent")
-                        win_percent = win_percent_stat["value"] if win_percent_stat else None
+                        win_percent = win_percent_stat["value"] if win_percent_stat else 0.0
 
                         streak_stat = stat_names.get("streak")
                         streak = streak_stat["displayValue"] if streak_stat else "None"
@@ -816,7 +819,7 @@ def espn_standings(sport="NHL"):
                         last_ten_record = last_ten_stat.get("summary") if last_ten_stat else "0-0"
 
                         # Calculate games_played if not directly available
-                        games_played = wins_value + losses_value if wins_value is not None and losses_value is not None else None
+                        games_played = wins_value + losses_value
                     except Exception as e:
                         print(f"Error processing team {name}: {e}")
                         continue
@@ -832,6 +835,7 @@ def espn_standings(sport="NHL"):
                         'away_record': away_record,
                         'last_ten_record': last_ten_record
                     })
+                    print(name)
 
             # Sort teams based on relevant statistics
             if sport == "NHL":
@@ -868,6 +872,7 @@ def extract_team_data(json_data, predict):
         home_team = game['teams']['home']
         away_team = game['teams']['away']
         game_data['Home Name'] = home_team['names']['name']
+        print(game_data['Home Name'])
         game_data['Home MoneyLine'] = home_team['moneyLine']
         game_data['Home Spread Price'] = home_team['spreadPrice']
         game_data['Home Score'] = home_team['score']
@@ -879,6 +884,7 @@ def extract_team_data(json_data, predict):
 
         # Extract away team data
         game_data['Away Name'] = away_team['names']['name']
+        print(game_data['Away Name'])
         game_data['Away MoneyLine'] = away_team['moneyLine']
         game_data['Away Spread Price'] = away_team['spreadPrice']
         game_data['Away Score'] = away_team['score']
@@ -903,6 +909,7 @@ def extract_team_data(json_data, predict):
 
 def fetch_odds_data(date, predict, sports):
     base_url = f"https://www.oddsshark.com/api/scores/{sports}/{date}?_format=json"
+    print(base_url)
 
     headers = {
         'Accept': 'application/json, text/plain, */*',
@@ -978,22 +985,22 @@ def merge_espn_odds(espn_df, odds_df, team_name_mapping, sport):
                 home_record = "0-0"
 
             merged_row.update({
-                'Home Team Points': home_stat.get('points'),
-                'Home Team Streak': home_stat.get('streak'),
+                'Home Team Points': home_stat.get('points', 0),
+                'Home Team Streak': home_stat.get('streak', "None"),
                 'Home Team Record': home_record,
-                'Home Team Games Played': home_stat.get('games_played'),
-                'Home Team Home Record': home_stat.get('home_record'),
-                'Home Team Away Record': home_stat.get('away_record'),
-                'Home Team Last 10': home_stat.get('last_ten_record')
+                'Home Team Games Played': home_stat.get('games_played', 0),
+                'Home Team Home Record': home_stat.get('home_record', "0-0"),
+                'Home Team Away Record': home_stat.get('away_record', "0-0"),
+                'Home Team Last 10': home_stat.get('last_ten_record', "0-0")
             })
 
         else:
             # If home_stats is empty, set default values
             merged_row.update({
-                'Home Team Points': None,
+                'Home Team Points': 0,
                 'Home Team Streak': "None",
                 'Home Team Record': "0-0" if sport == "NBA" else "0-0-0",
-                'Home Team Games Played': None,
+                'Home Team Games Played': 0,
                 'Home Team Home Record': "0-0",
                 'Home Team Away Record': "0-0",
                 'Home Team Last 10': "0-0"
@@ -1009,21 +1016,21 @@ def merge_espn_odds(espn_df, odds_df, team_name_mapping, sport):
                 away_record = "0-0"
 
             merged_row.update({
-                'Away Team Points': away_stat.get('points'),
-                'Away Team Streak': away_stat.get('streak'),
+                'Away Team Points': away_stat.get('points', 0),
+                'Away Team Streak': away_stat.get('streak', "None"),
                 'Away Team Record': away_record,
-                'Away Team Games Played': away_stat.get('games_played'),
-                'Away Team Home Record': away_stat.get('home_record'),
-                'Away Team Away Record': away_stat.get('away_record'),
-                'Away Team Last 10': away_stat.get('last_ten_record')
+                'Away Team Games Played': away_stat.get('games_played', 0),
+                'Away Team Home Record': away_stat.get('home_record', "0-0"),
+                'Away Team Away Record': away_stat.get('away_record', "0-0"),
+                'Away Team Last 10': away_stat.get('last_ten_record', "0-0")
             })
         else:
             # If away_stats is empty, set default values
             merged_row.update({
-                'Away Team Points': None,
+                'Away Team Points': 0,
                 'Away Team Streak': "None",
                 'Away Team Record': "0-0" if sport == "NBA" else "0-0-0",
-                'Away Team Games Played': None,
+                'Away Team Games Played': 0,
                 'Away Team Home Record': "0-0",
                 'Away Team Away Record': "0-0",
                 'Away Team Last 10': "0-0"
@@ -1119,6 +1126,7 @@ def calculate_average_points(team_name, historical_games):
         axis=1
     )
     avg_points = points_scored.mean()
+    print(avg_points)
 
     # Calculate average points scored in the last 10 games
     last_10_games = team_games.sort_values(by='Date', ascending=False).head(10)
@@ -1130,8 +1138,8 @@ def calculate_average_points(team_name, historical_games):
 
     # Return the relevant averages
     return {
-        'avg_points': avg_points,                # Metric 5: Average points per game
-        'avg_points_10_games': avg_points_10_games # Metric 6: Average points in last 10 games
+        'avg_points': avg_points,                # Metric 5
+        'avg_points_10_games': avg_points_10_games # Metric 6
     }
 
 def calculate_win_loss_streaks(team_name, historical_games):
@@ -1152,7 +1160,6 @@ def calculate_win_loss_streaks(team_name, historical_games):
 
     if team_games.empty:
         return {
-            'win_streak': 0,
             'win_streak_home_away': 0
         }
 
@@ -1191,9 +1198,9 @@ def calculate_win_loss_streaks(team_name, historical_games):
         else:
             break  # Streak ended
 
+    print(win_streak_home_away)
     return {
-        'win_streak': win_streak,                   # Metric 7
-        'win_streak_home_away': win_streak_home_away # Metric 8
+        'win_streak_home_away': win_streak_home_away # Metric 7
     }
 
 def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA'):
@@ -1212,9 +1219,6 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
     team_data = {}
     team_name = row.get(f'{team_type} Team')
 
-    # Define other_team_type
-    other_team_type = 'Away' if team_type == 'Home' else 'Home'
-
     if not team_name:
         print(f"{team_type} Team name is missing in the row.")
         # Set all metrics to default
@@ -1226,8 +1230,7 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
             'last_10_games': 0,             # Metric 4
             'avg_points': 0,                # Metric 5
             'avg_points_10_games': 0,       # Metric 6
-            'win_streak': 0,                # Metric 7
-            'win_streak_home_away': 0       # Metric 8
+            'win_streak_home_away': 0       # Metric 7
         }
         return team_data  # Return default metrics
 
@@ -1284,7 +1287,7 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
         print(f"{team_type} Team Home/Away Record is missing or not a string for {team_name}.")
         team_data['home_away_record'] = 0  # Metric 2
 
-    # 3) Home_away_10_games = Home_away for last 10 games
+    # 3) Home_away_10_games = away_record - home_record for the last 10 games
     if historical_games is not None:
         try:
             if team_type == 'Home':
@@ -1309,7 +1312,7 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
     else:
         team_data['home_away_10_game_records'] = 0  # Metric 3
 
-    # 4) Last_10_games_points = Record_points for last 10 games
+    # 4) Last_10_games_points = wins - losses of the last 10 games
     if historical_games is not None:
         try:
             last_10_games = historical_games[
@@ -1335,8 +1338,8 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
     else:
         team_data['last_10_games'] = 0  # Metric 4
 
-    # 5) Avg_points = total_points / num_games
-    # 6) Avg_points_10_games = Avg_points for last 10 games
+    # 5) Avg_points = total_goals / num_games
+    # 6) Avg_points_10_games = total_goals / num_games of the last 10 games
     if historical_games is not None:
         try:
             avg_points_data = calculate_average_points(team_name, historical_games)
@@ -1350,20 +1353,16 @@ def prepare_team_data(row, team_type='Home', historical_games=None, sport='NBA')
         team_data['avg_points'] = 0  # Metric 5
         team_data['avg_points_10_games'] = 0  # Metric 6
 
-    # 7) Win_streak = num consecutive wins
-    # 8) Win_streak_home_away = num consecutive wins home or away
+    # 7) Win_streak_home_away = number of consecutive wins home or away
     if historical_games is not None:
         try:
             streak_data = calculate_win_loss_streaks(team_name, historical_games)
-            team_data['win_streak'] = streak_data.get('win_streak', 0)  # Metric 7
-            team_data['win_streak_home_away'] = streak_data.get('win_streak_home_away', 0)  # Metric 8
+            team_data['win_streak_home_away'] = streak_data.get('win_streak_home_away', 0)  # Metric 7
         except Exception as e:
             print(f"Error calculating win streaks for {team_name}: {e}")
-            team_data['win_streak'] = 0  # Metric 7
-            team_data['win_streak_home_away'] = 0  # Metric 8
+            team_data['win_streak_home_away'] = 0  # Metric 7
     else:
-        team_data['win_streak'] = 0  # Metric 7
-        team_data['win_streak_home_away'] = 0  # Metric 8
+        team_data['win_streak_home_away'] = 0  # Metric 7
 
     # 2) Ensure 'home_away_record' is present
     if 'home_away_record' not in team_data:
@@ -1379,7 +1378,7 @@ def safe_to_lower(text):
 def main():
     date = (datetime.today() + timedelta(days=0)).strftime('%Y-%m-%d')
     today_str = datetime.today().strftime("%Y-%m-%d")
-    sports = "NHL"  # Change to "NHL" as needed
+    sports = "NBA"  # Change to "NHL" or "NBA" as needed
     days = 30
 
     # Select the appropriate team name mapping
@@ -1426,7 +1425,7 @@ def main():
     print("Historical Games Data:")
     print(historical_games)
 
-    # Initialize the Algo class (ensure you have defined this class)
+    # Initialize the Algo class
     algo = Algo(safe_to_lower(sports))
     predictions = []
 
