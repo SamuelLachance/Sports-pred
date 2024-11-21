@@ -29,6 +29,8 @@ import os
 import warnings
 import traceback
 import time
+warnings.filterwarnings("ignore")
+
 
 get_requests_count = 0
 start_time = time.time()
@@ -402,7 +404,7 @@ def valuator_multi_phase(
 
     ### Estimate invested Capital
     invested_capital = pd.concat([invested_capital,
-                                        pd.Series(np.NaN)])
+                                        pd.Series(np.nan)])
     ### Estimate ROIC
     terminal_ROIC = terminal_cost_of_capital+additional_return_on_cost_of_capital_in_perpetuity
     ROIC = pd.concat([ROIC,
@@ -476,7 +478,7 @@ def valuator_multi_phase(
         period = int(period)
         cum_return_series = pd.Series([1+value]*period).cumprod()
         if append_nan:
-            cum_return_series = pd.concat([cum_return_series,pd.Series(np.NAN)])
+            cum_return_series = pd.concat([cum_return_series,pd.Series(np.nan)])
         return(cum_return_series)
 
     acceptable_annualized_return_on_equity = ((cum_cost_of_equity_at_the_end_of_valuation)**(1/valuation_interval_in_years))-1
@@ -501,7 +503,7 @@ def valuator_multi_phase(
     df_valuation['cum_expected_annualized_return_on_equity'] = cum_expected_annualized_return_on_equity
     df_valuation['cum_excess_annualized_return_on_equity'] = cum_excess_annualized_return_on_equity
     df_valuation['cum_excess_annualized_return_on_equity_realized'] = df_valuation['cum_expected_annualized_return_on_equity']/df_valuation['cumCostOfEquity']
-    df_valuation['excess_annualized_return_on_equity'] = pd.concat([pd.Series([excess_annualized_return_on_equity]*int(valuation_interval_in_years)),pd.Series(np.NAN)])
+    df_valuation['excess_annualized_return_on_equity'] = pd.concat([pd.Series([excess_annualized_return_on_equity]*int(valuation_interval_in_years)),pd.Series(np.nan)])
     # print("valuation complete")
     return({'valuation':df_valuation,
             'firm_value':firm_value,
@@ -1066,6 +1068,7 @@ def valuation_describer(df_intc_valuation,sharesOutstanding):
                               width=720)
     fig_cdf = fig_cdf.add_vline(x = current_market_cap, line_dash = 'dash',line_color='black',annotation_text="-Current Market Cap", annotation_font_size=10)
     ### Model Correlation Chart
+    df_intc_valuation = df_intc_valuation.apply(pd.to_numeric, errors='coerce')
     fig_model_correlation_chart = px.bar(df_intc_valuation.rename(columns=dict(zip(df_intc_valuation.columns,
                                      [c.replace("_"," ") for c in df_intc_valuation.columns]))).corr(method='pearson')[['equity valuation']].sort_values(
                                          "equity valuation",ascending=False).reset_index(),
@@ -1482,16 +1485,15 @@ def get_current_operating_margin(TICKER):
         # Fetch the company data
         api_key = "435820a51119704ed53f7e7fb8a0cfec" # Example ticker
         test4 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=quarter&apikey={api_key}"
+        print(test4)
         response4 = requests.get(test4)
         data4 = response4.json()
         
         # Extract operating income and total revenue
         operating_income = data4[0].get('operatingIncome')
+        if operating_income == 0 :
+            operating_income = data4[0].get('netIncome')
         total_revenue = data4[0].get('revenue')
-
-        # If either value is missing or zero, return 0
-        if not operating_income or not total_revenue:
-            return 0
 
         # Calculate and return the operating margin
         return operating_income / total_revenue
@@ -1671,6 +1673,7 @@ def process_ticker(TICKER, excel_path):
     test2 = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{TICKER}?period=annual&apikey={api_key}"
     test3 = f"https://financialmodelingprep.com/api/v3/profile/{TICKER}?apikey={api_key}"
     test4 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=quarter&apikey={api_key}"
+    print(test4)
     test5 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=annual&apikey={api_key}"
     response = requests.get(test)
     response2 = requests.get(test2)
@@ -1893,6 +1896,8 @@ def process_ticker(TICKER, excel_path):
 
     asset_liquidation_during_negative_growth1 = 0
 
+    current_invested_capital = revenue_base1 / current_sales_to_capital_ratio1
+
     base_case_valuation = valuator_multi_phase(
                 risk_free_rate = risk_free_rate1,
                 ERP = ERP1,
@@ -1967,6 +1972,66 @@ def process_ticker(TICKER, excel_path):
     print(f"$$Real value per share$$ : ${real_value}")
 
     point_estimate_describer(base_case_valuation)
+
+##    df_valuation = monte_carlo_valuator_multi_phase(
+##        risk_free_rate = ot.Normal(float(risk_free_rate1), 0.002),
+##        ERP = ot.Normal(float(ERP1), 0.001),
+##        equity_value = ot.Triangular(float(equity_value1 - 6), float(equity_value1), float(equity_value1 + 6)),  # Allowing a little variation
+##        debt_value = ot.Triangular(float(debt_value1 - 0.3), float(debt_value1), float(debt_value1 + 0.3)),
+##        unlevered_beta = ot.Triangular(float(unlevered_beta1 - 0.1), float(unlevered_beta1), float(unlevered_beta1 + 0.1)),
+##        terminal_unlevered_beta = ot.Triangular(float(terminal_unlevered_beta1 - 0.1), float(terminal_unlevered_beta1), float(terminal_unlevered_beta1 + 0.1)),
+##        year_beta_begins_to_converge_to_terminal_beta = ot.Uniform(float(year_beta_begins_to_converge_to_terminal_beta1), float(year_beta_begins_to_converge_to_terminal_beta1 + 1)),
+##        current_pretax_cost_of_debt = ot.Triangular(float(current_pretax_cost_of_debt1 - 0.003), float(current_pretax_cost_of_debt1), float(current_pretax_cost_of_debt1 + 0.003)),
+##        terminal_pretax_cost_of_debt = ot.Triangular(float(terminal_pretax_cost_of_debt1 - 0.003), float(terminal_pretax_cost_of_debt1), float(terminal_pretax_cost_of_debt1 + 0.003)),
+##        year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt = ot.Uniform(float(year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1), float(year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1 + 1)),
+##        current_effective_tax_rate = ot.Triangular(float(current_effective_tax_rate1 - 0.01), float(current_effective_tax_rate1), float(current_effective_tax_rate1 + 0.01)),
+##        marginal_tax_rate = ot.Triangular(float(marginal_tax_rate1 - 0.02), float(marginal_tax_rate1), float(marginal_tax_rate1 + 0.02)),
+##        year_effective_tax_rate_begin_to_converge_marginal_tax_rate = ot.Uniform(float(year_effective_tax_rate_begin_to_converge_marginal_tax_rate1), float(year_effective_tax_rate_begin_to_converge_marginal_tax_rate1 + 1)),
+##        revenue_base = ot.Triangular(float(revenue_base1 - 0.4), float(revenue_base1), float(revenue_base1 + 0.4)),
+##        revenue_growth_rate_cycle1_begin = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle1_begin1), scale= 0.032))),
+##        revenue_growth_rate_cycle1_end = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle1_end1), scale= 0.033))),
+##        length_of_cylcle1 = ot.Uniform(float(length_of_cylcle1_1), float(length_of_cylcle1_1 + 2)),
+##        revenue_growth_rate_cycle2_begin = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle2_begin1), scale= 0.034))),
+##        revenue_growth_rate_cycle2_end = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle2_end1), scale= 0.032))),
+##        length_of_cylcle2 = ot.Uniform(float(length_of_cylcle2_1), float(length_of_cylcle2_1 + 2)),
+##        revenue_growth_rate_cycle3_begin = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle3_begin1), scale= 0.024))),
+##        revenue_growth_rate_cycle3_end = ot.Normal(float(revenue_growth_rate_cycle3_end1), 0.002),
+##        length_of_cylcle3 = ot.Uniform(float(length_of_cylcle3_1), float(length_of_cylcle3_1 + 2)),
+##        revenue_convergance_periods_cycle1 = ot.Uniform(float(revenue_convergance_periods_cycle1_1), float(revenue_convergance_periods_cycle1_1 + 1)),
+##        revenue_convergance_periods_cycle2 = ot.Uniform(float(revenue_convergance_periods_cycle2_1), float(revenue_convergance_periods_cycle2_1 + 1)),
+##        revenue_convergance_periods_cycle3 = ot.Uniform(float(revenue_convergance_periods_cycle3_1), float(revenue_convergance_periods_cycle3_1 + 1)),
+##        current_sales_to_capital_ratio = ot.Triangular(float(current_sales_to_capital_ratio1 - 0.2), float(current_sales_to_capital_ratio1), float(current_sales_to_capital_ratio1 + 0.2)),
+##        terminal_sales_to_capital_ratio = ot.Triangular(float(terminal_sales_to_capital_ratio1 - 0.2), float(terminal_sales_to_capital_ratio1), float(terminal_sales_to_capital_ratio1 + 0.2)),
+##        year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital = ot.Uniform(float(year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1), float(year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1 + 1)),
+##        current_operating_margin = ot.Triangular(float(current_operating_margin1 - 0.005), float(current_operating_margin1), float(current_operating_margin1 + 0.005)),
+##        terminal_operating_margin = ot.Triangular(float(terminal_operating_margin1 - 0.02), float(terminal_operating_margin1), float(terminal_operating_margin1 + 0.02)),
+##        year_operating_margin_begins_to_converge_to_terminal_operating_margin = ot.Uniform(float(year_operating_margin_begins_to_converge_to_terminal_operating_margin1), float(year_operating_margin_begins_to_converge_to_terminal_operating_margin1 + 1)),
+##        additional_return_on_cost_of_capital_in_perpetuity = ot.Triangular(float(additional_return_on_cost_of_capital_in_perpetuity1 - 0.01), float(additional_return_on_cost_of_capital_in_perpetuity1), float(additional_return_on_cost_of_capital_in_perpetuity1 + 0.01)),
+##        cash_and_non_operating_asset = ot.Uniform(float(cash_and_non_operating_asset1 - 0.2), float(cash_and_non_operating_asset1 + 0.2)),
+##        asset_liquidation_during_negative_growth = ot.Uniform(float(asset_liquidation_during_negative_growth1 - 0.000000001), float(asset_liquidation_during_negative_growth1 + 0.000000001)),
+##        current_invested_capital = ot.Uniform(float(current_invested_capital - 0.1), float(current_invested_capital + 0.1)),
+##        sample_size= 20000,
+##        list_of_correlation_between_variables=[
+##            ['revenue_growth_rate_cycle3_end', 'risk_free_rate', 0.95],
+##            ['revenue_growth_rate_cycle3_end', 'terminal_pretax_cost_of_debt', 0.9],
+##            ['terminal_pretax_cost_of_debt', 'risk_free_rate', 0.9],
+##            ['ERP', 'revenue_growth_rate_cycle2_begin', 0.4],
+##            ['ERP', 'revenue_growth_rate_cycle2_end', 0.4],
+##            ['ERP', 'revenue_growth_rate_cycle3_begin', 0.4],
+##            ['additional_return_on_cost_of_capital_in_perpetuity', 'terminal_sales_to_capital_ratio', 0.25],
+##            ['additional_return_on_cost_of_capital_in_perpetuity', 'terminal_operating_margin', 0.5],
+##            ['terminal_sales_to_capital_ratio', 'terminal_operating_margin', 0.5],
+##        ]
+##    )
+##
+##    print(df_valuation.dtypes)
+##    print(df_valuation.head())
+##
+##
+##
+##    valuation_describer(df_valuation,
+##                    sharesOutstanding=number_of_share)
+    
 
 # Read the CSV file
 ticker_df = pd.read_csv('beta.csv')
