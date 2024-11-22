@@ -1,20 +1,23 @@
-import pandas as pd
+import os
+import time
+import json
+import requests
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+
+from tqdm import tqdm
+from datetime import datetime, timedelta
 from scipy.stats import pearsonr
 from scipy.optimize import curve_fit
 from sklearn.metrics import log_loss
-from tqdm import tqdm
-import requests
-import json
-import os
-import time
-from datetime import datetime, timedelta
-import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import gspread
 from pandas import json_normalize
+import warnings
+warnings.filterwarnings("ignore")
 
-class Team():
+class Team:
     def __init__(self, name):
         self.name = name
         self.team_game_list = []
@@ -34,48 +37,41 @@ class Team():
             print(f'{game.home_team.name}  {game.home_score}-{game.away_score}  {game.away_team.name}')
 
     def calc_agd(self):
-        goal_differential = 0
-        for game in self.team_game_list:
-            if self == game.home_team:
-                goal_differential += game.home_score - game.away_score
-            else:
-                goal_differential += game.away_score - game.home_score
-        agd = goal_differential / len(self.team_game_list)
-
+        goal_differential = sum(
+            (game.home_score - game.away_score) if self == game.home_team else (game.away_score - game.home_score)
+            for game in self.team_game_list
+        )
+        agd = goal_differential / len(self.team_game_list) if self.team_game_list else 0
         return agd
 
     def calc_sched(self):
-        self.opponent_power = []
-        for game in self.team_game_list:
-            if self == game.home_team:
-                self.opponent_power.append(game.away_team.prev_power)
-            else:
-                self.opponent_power.append(game.home_team.prev_power)
-
-        return sum(self.opponent_power) / len(self.opponent_power)
+        self.opponent_power = [
+            (game.away_team.prev_power if self == game.home_team else game.home_team.prev_power)
+            for game in self.team_game_list
+        ]
+        return sum(self.opponent_power) / len(self.opponent_power) if self.opponent_power else 0
 
     def calc_power(self):
         return self.calc_sched() + self.agd
 
     def calc_pct(self):
-        wins = int(self.record[:self.record.find('-')])
-        losses = int(self.record[len(str(wins))+1:][:self.record[len(str(wins))+1:].find('-')])
-        otl = int(self.record[len(str(losses))+len(str(wins))+2:])
-        point_percentage = (wins*2+otl)/(len(self.team_game_list)*2)
-        return point_percentage
+        try:
+            wins, losses, otl = map(int, self.record.split('-'))
+            point_percentage = (wins * 2 + otl) / (len(self.team_game_list) * 2) if self.team_game_list else 0
+            return point_percentage
+        except (ValueError, ZeroDivisionError):
+            return 0
 
     def calc_consistency(self):
-        performance_list = []
-        for game in self.team_game_list:
-            if self == game.home_team:
-                performance_list.append(game.away_team.power + game.home_score - game.away_score)
-            else:
-                performance_list.append(game.away_team.power + game.home_score - game.away_score)
-
-        variance = np.var(performance_list)
+        performance_list = [
+            opponent.power + (game.home_score - game.away_score if self == game.home_team else game.away_score - game.home_score)
+            for game in self.team_game_list
+            for opponent in [game.away_team if self == game.home_team else game.home_team]
+        ]
+        variance = np.var(performance_list) if performance_list else 0
         return variance
 
-class Game():
+class Game:
     def __init__(self, home_team, away_team, home_score, away_score, date):
         self.home_team = home_team
         self.away_team = away_team
@@ -85,45 +81,36 @@ class Game():
 
 def game_team_object_creation(games_metadf):
     total_game_list = []
-    team_list = []
+    team_dict = {}
 
-    for index, row in games_metadf.iterrows():
+    for _, row in games_metadf.iterrows():
         try:
-            row['Home Goals'] = float(row['Home Goals'])
-            row['Away Goals'] = float(row['Away Goals'])
+            home_score = float(row['Home Goals'])
+            away_score = float(row['Away Goals'])
+            home_team_name = row['Home Team']
+            away_team_name = row['Away Team']
 
-            team_in_list = False
-            for team in team_list:
-                if team.name == row['Home Team']:
-                    team_in_list = True
-                    home_team_obj = team
-            if team_in_list == False:
-                home_team_obj = Team(row['Home Team'])
-                team_list.append(home_team_obj)
+            # Get or create home team
+            home_team = team_dict.setdefault(home_team_name, Team(home_team_name))
 
-            team_in_list = False
-            for team in team_list:
-                if team.name == row['Away Team']:
-                    team_in_list = True
-                    away_team_obj = team
-            if team_in_list == False:
-                away_team_obj = Team(row['Away Team'])
-                team_list.append(away_team_obj)
+            # Get or create away team
+            away_team = team_dict.setdefault(away_team_name, Team(away_team_name))
 
-            game_obj = Game(home_team_obj, away_team_obj, row['Home Goals'], row['Away Goals'], row['Date'])
+            game_obj = Game(home_team, away_team, home_score, away_score, row['Date'])
 
-            home_team_obj.team_game_list.append(game_obj)
-            away_team_obj.team_game_list.append(game_obj)
-            home_team_obj.goals_for += game_obj.home_score
-            away_team_obj.goals_against += game_obj.home_score
-            home_team_obj.goals_against += game_obj.away_score
-            away_team_obj.goals_for += game_obj.away_score
-            home_team_obj.record = row['Home Record']
-            away_team_obj.record = row['Away Record']
+            home_team.team_game_list.append(game_obj)
+            away_team.team_game_list.append(game_obj)
+            home_team.goals_for += game_obj.home_score
+            away_team.goals_against += game_obj.home_score
+            home_team.goals_against += game_obj.away_score
+            away_team.goals_for += game_obj.away_score
+            home_team.record = row['Home Record']
+            away_team.record = row['Away Record']
             total_game_list.append(game_obj)
         except ValueError:
-            pass
+            continue
 
+    team_list = list(team_dict.values())
     return team_list, total_game_list
 
 def scrape_nhl_data():
@@ -131,32 +118,46 @@ def scrape_nhl_data():
     team_id_dict = {}
 
     team_metadata = requests.get("https://api.nhle.com/stats/rest/en/team").json()
-    for team in tqdm(team_metadata['data'], desc='Scraping Games', dynamic_ncols=True, colour='Green', bar_format='{l_bar}{bar:30}{r_bar}{bar:-10b}'):
+    excluded_teams = {'Atlanta Thrashers', 'Hartford Whalers', 'Minnesota North Stars', 'Quebec Nordiques',
+                      'Winnipeg Jets (1979)', 'Colorado Rockies', 'Ottawa Senators (1917)', 'Hamilton Tigers',
+                      'Pittsburgh Pirates', 'Philadelphia Quakers', 'Detroit Cougars', 'Montreal Wanderers',
+                      'Quebec Bulldogs', 'Montreal Maroons', 'New York Americans', 'St. Louis Eagles',
+                      'Oakland Seals', 'Atlanta Flames', 'Kansas City Scouts', 'Cleveland Barons',
+                      'Detroit Falcons', 'Brooklyn Americans', 'California Golden Seals', 'Toronto Arenas',
+                      'Toronto St. Patricks', 'NHL'}
 
-        if team['fullName'] in ['Atlanta Thrashers', 'Hartford Whalers', 'Minnesota North Stars', 'Quebec Nordiques', 'Winnipeg Jets (1979)', 'Colorado Rockies', 'Ottawa Senators (1917)', 'Hamilton Tigers', 'Pittsburgh Pirates', 'Philadelphia Quakers', 'Detroit Cougars', 'Montreal Wanderers', 'Quebec Bulldogs', 'Montreal Maroons', 'New York Americans', 'St. Louis Eagles', 'Oakland Seals', 'Atlanta Flames', 'Kansas City Scouts', 'Cleveland Barons', 'Detroit Falcons', 'Brooklyn Americans', 'California Golden Seals', 'Toronto Arenas', 'Toronto St. Patricks', 'NHL']:
+    for team in tqdm(team_metadata['data'], desc='Scraping Games', dynamic_ncols=True, colour='Green', bar_format='{l_bar}{bar:30}{r_bar}{bar:-10b}'):
+        team_name = team['fullName']
+        if team_name in excluded_teams:
             continue
 
-        team_id_dict[team['id']] = team['fullName']
+        team_id = team['id']
+        team_id_dict[team_id] = team_name
 
         game_metadata = requests.get(f"https://api-web.nhle.com/v1/club-schedule-season/{team['triCode']}/20242025").json()
 
-        for game in game_metadata['games']:
+        for game in game_metadata.get('games', []):
             if game['gameType'] == 2 and game['gameState'] == 'OFF':
-                data.append({'GameID':game['id'], 'Date':game['gameDate'], 'Home Team':game['homeTeam']['id'], 'Home Goals':game['homeTeam']['score'], 'Away Goals':game['awayTeam']['score'], 'Away Team':game['awayTeam']['id'], "FinalState":game['gameOutcome']['lastPeriodType']})
+                data.append({
+                    'GameID': game['id'],
+                    'Date': game['gameDate'],
+                    'Home Team': game['homeTeam']['id'],
+                    'Home Goals': game['homeTeam']['score'],
+                    'Away Goals': game['awayTeam']['score'],
+                    'Away Team': game['awayTeam']['id'],
+                    'FinalState': game['gameOutcome']['lastPeriodType']
+                })
 
     scraped_df = pd.DataFrame(data)
     scraped_df['Home Team'] = scraped_df['Home Team'].replace(team_id_dict)
     scraped_df['Away Team'] = scraped_df['Away Team'].replace(team_id_dict)
     scraped_df = scraped_df.drop_duplicates(subset='GameID')
     scraped_df = scraped_df.sort_values(by=['GameID'])
-    scraped_df = calculate_records(scraped_df) # Adds home and away record columns
+    scraped_df = calculate_records(scraped_df)
     return scraped_df, team_id_dict
 
 def calculate_records(df):
-    # Combine unique teams from both 'Home Team' and 'Away Team' columns
     all_teams = pd.concat([df['Home Team'], df['Away Team']]).unique()
-
-    # Initialize records dictionary for all teams
     records = {team: {'wins': 0, 'losses': 0, 'ot_losses': 0} for team in all_teams}
 
     for index, row in df.iterrows():
@@ -179,11 +180,11 @@ def calculate_records(df):
                 records[home_team]['ot_losses'] += 1
             records[away_team]['wins'] += 1
         else:
-            print(f'Critical Error: Found Tie | Information: {home_team} {home_goals}-{away_goals} {away_team}') # should never happen
-            return
+            print(f'Critical Error: Found Tie | Information: {home_team} {home_goals}-{away_goals} {away_team}')
+            continue
 
-        df.loc[index, 'Home Record'] = f"{records[home_team]['wins']}-{records[home_team]['losses']}-{records[home_team]['ot_losses']}"
-        df.loc[index, 'Away Record'] = f"{records[away_team]['wins']}-{records[away_team]['losses']}-{records[away_team]['ot_losses']}"
+        df.at[index, 'Home Record'] = f"{records[home_team]['wins']}-{records[home_team]['losses']}-{records[home_team]['ot_losses']}"
+        df.at[index, 'Away Record'] = f"{records[away_team]['wins']}-{records[away_team]['losses']}-{records[away_team]['ot_losses']}"
 
     return df
 
@@ -192,31 +193,38 @@ def assign_power(team_list, iterations):
         team.agd = team.calc_agd()
         team.pct = team.calc_pct()
 
-    for iteration in range(iterations):
-        # print(f'ITERATION {iteration+1}')
+    for _ in range(iterations):
         for team in team_list:
             team.schedule = team.calc_sched()
             team.power = team.calc_power()
-            # print(f'{team.name}\t\tAGD: {team.calc_agd():.2f}\tSCHEDULE: {team.schedule:.2f}\t\tPOWER: {team.power:.2f}')
         for team in team_list:
             team.prev_power = team.power
 
 def prepare_power_rankings(team_list):
-    power_df = pd.DataFrame()
-    for team in team_list:
-        power_df = pd.concat([power_df, pd.DataFrame.from_dict([{'Team':team.name, 'POWER':round(team.power,2), 'Record':team.record, 'PCT':f"{team.calc_pct():.3f}",'Avg Goal Differential':round(team.calc_agd(),2), 'GF/Game':f"{team.goals_for/len(team.team_game_list):.2f}", 'GA/Game':f"{team.goals_against/len(team.team_game_list):.2f}", 'Strength of Schedule':f"{team.schedule:.3f}"}])], ignore_index=True)
-    power_df.sort_values(by=['POWER'], inplace=True, ascending=False)
-    power_df = power_df.reset_index(drop=True)
-    power_df.index += 1
+    power_data = [{
+        'Team': team.name,
+        'POWER': round(team.power, 2),
+        'Record': team.record,
+        'PCT': f"{team.calc_pct():.3f}",
+        'Avg Goal Differential': round(team.calc_agd(), 2),
+        'GF/Game': f"{team.goals_for / len(team.team_game_list):.2f}" if team.team_game_list else '0.00',
+        'GA/Game': f"{team.goals_against / len(team.team_game_list):.2f}" if team.team_game_list else '0.00',
+        'Strength of Schedule': f"{team.schedule:.3f}"
+    } for team in team_list]
 
+    power_df = pd.DataFrame(power_data)
+    power_df.sort_values(by=['POWER'], inplace=True, ascending=False)
+    power_df.reset_index(drop=True, inplace=True)
+    power_df.index += 1
     return power_df
 
 def logistic_regression(total_game_list):
-    xpoints = [] # Rating differential (Home - Away)
-    ypoints = [] # Home Win/Loss Boolean (Win = 1, Tie = 0.5, Loss = 0)
+    xpoints = []
+    ypoints = []
 
     for game in total_game_list:
-        xpoints.append(game.home_team.power - game.away_team.power)
+        rating_diff = game.home_team.power - game.away_team.power
+        xpoints.append(rating_diff)
 
         if game.home_score > game.away_score:
             ypoints.append(1)
@@ -225,23 +233,25 @@ def logistic_regression(total_game_list):
         else:
             ypoints.append(0.5)
 
-    parameters, covariates = curve_fit(lambda t, param: 1/(1+np.exp((t)/param)), [-x for x in xpoints], ypoints) # Regression only works if parameter is positive.
+    parameters, _ = curve_fit(lambda t, param: 1 / (1 + np.exp(t / param)), [-x for x in xpoints], ypoints)
     param = -parameters[0]
-
     return xpoints, ypoints, param
 
 def model_performance(xpoints, ypoints, param):
-    x_fitted = np.linspace(np.min(xpoints)*1.25, np.max(xpoints)*1.25, 100)
-    y_fitted = 1/(1+np.exp((x_fitted)/param))
+    x_fitted = np.linspace(np.min(xpoints) * 1.25, np.max(xpoints) * 1.25, 100)
+    y_fitted = 1 / (1 + np.exp(x_fitted / param))
 
-    r, p = pearsonr(xpoints, ypoints)
+    r, _ = pearsonr(xpoints, ypoints)
+    log_loss_value = log_loss(ypoints, 1 / (1 + np.exp(np.array(xpoints) / param)))
+
     print(f'Pearson Correlation of Independent and Dependent Variables: {r:.3f}')
-    print(f'Log Loss of the Cumulative Distribution Function (CDF): {log_loss(ypoints, 1/(1+np.exp((xpoints)/param))):.3f}')
+    print(f'Log Loss of the Cumulative Distribution Function (CDF): {log_loss_value:.3f}')
     print(f'Regressed Sigmoid: 1/(1+exp((x)/{param:.3f}))')
     print(f'Precise Parameter: {param}')
 
     plt.plot(xpoints, ypoints, 'o', color='grey')
-    plt.plot(x_fitted, y_fitted, color='black', alpha=1, label=f'CDF (Log Loss = {log_loss(ypoints, 1/(1+np.exp((xpoints)/param))):.3f})')
+    plt.plot(x_fitted, y_fitted, color='black', alpha=1,
+             label=f'CDF (Log Loss = {log_loss_value:.3f})')
     plt.legend()
     plt.title('Logistic Regression of Team Rating Difference vs Game Result')
     plt.xlabel('Rating Difference')
@@ -249,169 +259,206 @@ def model_performance(xpoints, ypoints, param):
     plt.show()
 
 def calc_prob(team, opponent, param):
-    return 1/(1+np.exp((team.power-opponent.power)/param))
+    return 1 / (1 + np.exp((team.power - opponent.power) / param))
 
 def calc_spread(team, opponent, param, lower_bound_spread, upper_bound_spread):
-    if lower_bound_spread == '-inf':
-        if upper_bound_spread == 'inf':
-            return 1
-        return 1/(1+np.exp((upper_bound_spread-(team.power-opponent.power))/param))
-    elif upper_bound_spread == 'inf':
-        return 1 - 1/(1+np.exp((lower_bound_spread-(team.power-opponent.power))/param))
-    else:
-        return 1/(1+np.exp((upper_bound_spread-(team.power-opponent.power))/param)) - 1/(1+np.exp((lower_bound_spread-(team.power-opponent.power))/param))
+    lower_bound = float(lower_bound_spread) if lower_bound_spread != '-inf' else -np.inf
+    upper_bound = float(upper_bound_spread) if upper_bound_spread != 'inf' else np.inf
+    cdf_lower = 1 / (1 + np.exp((lower_bound - (team.power - opponent.power)) / param))
+    cdf_upper = 1 / (1 + np.exp((upper_bound - (team.power - opponent.power)) / param))
+    return cdf_upper - cdf_lower
 
 def download_csv_option(df, filename):
-    valid = False
-    while valid == False:
-        user_input = input('Would you like to download this as a CSV? (Y/N): ')
-        if user_input.lower() in ['y', 'yes', 'y.', 'yes.']:
-            valid = True
-        elif user_input.lower() in ['n', 'no', 'n.', 'no.']:
-            return
-        else:
-            print(f'Sorry, I could not understand "{user_input}". Please enter Y or N: ')
-
-    if not os.path.exists(f'{os.path.dirname(__file__)}/Output CSV Data'):
-        os.makedirs(f'{os.path.dirname(__file__)}/Output CSV Data')
-    df.to_csv(f'{os.path.dirname(__file__)}/Output CSV Data/{filename}.csv')
-    print(f'{filename}.csv has been downloaded to the following directory: {os.path.dirname(__file__)}/Output CSV Data')
-    return
-
+    user_input = input('Would you like to download this as a CSV? (Y/N): ').strip().lower()
+    if user_input in ['y', 'yes']:
+        output_dir = os.path.join(os.path.dirname(__file__), 'Output CSV Data')
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f'{filename}.csv')
+        df.to_csv(output_path)
+        print(f'{filename}.csv has been downloaded to: {output_path}')
 
 def get_todays_games(param, team_list, team_id_dict):
-
-    # Get today's date in the format YYYY-MM-DD
-    #today_date = datetime.today().strftime('%Y-%m-%d')
-
-    today_date = (datetime.today() + timedelta(days=0)).strftime('%Y-%m-%d')
-
-    # Use today's date in the API request URL
+    today_date = datetime.today().strftime('%Y-%m-%d')
     today_schedule = requests.get(f"https://api-web.nhle.com/v1/schedule/{today_date}").json()
-    
-    #today_schedule = requests.get("https://api-web.nhle.com/v1/schedule/now").json()
 
-    today_games_df = pd.DataFrame(columns = ['GameID', 'Game State', 'Home Team', 'Home Goals', 'Away Goals', 'Away Team', 'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability', 'Home Record', 'Away Record'])
+    columns = [
+        'GameID', 'Game State', 'Home Team', 'Home Goals', 'Away Goals',
+        'Away Team', 'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability',
+        'Home Record', 'Away Record'
+    ]
+    rows = []
 
     try:
         date = today_schedule['gameWeek'][0]['date']
-        for games in today_schedule['gameWeek'][0]['games']:
-            for team in team_list:
-                if team.name == team_id_dict[games['homeTeam']['id']]:
-                    home_team_obj = team
-                elif team.name == team_id_dict[games['awayTeam']['id']]:
-                    away_team_obj = team
+        for game in today_schedule['gameWeek'][0]['games']:
+            home_team_id = game['homeTeam']['id']
+            away_team_id = game['awayTeam']['id']
+            home_team_name = team_id_dict.get(home_team_id)
+            away_team_name = team_id_dict.get(away_team_id)
+            home_team_obj = next((t for t in team_list if t.name == home_team_name), None)
+            away_team_obj = next((t for t in team_list if t.name == away_team_name), None)
 
-            home_win_prob = calc_prob(home_team_obj, away_team_obj, param)
-            away_win_prob = 1-home_win_prob
+            if not home_team_obj or not away_team_obj:
+                continue
 
-            if games['gameState'] == 'OFF': # final
-                today_games_df = pd.concat([today_games_df, pd.DataFrame.from_dict([{'GameID':games['id'], 'Game State':'Final', 'Home Team':team_id_dict[games['homeTeam']['id']], 'Home Goals':games['homeTeam']['score'], 'Away Goals':games['awayTeam']['score'], 'Away Team':team_id_dict[games['awayTeam']['id']], 'Pre-Game Home Win Probability':f'{home_win_prob*100:.2f}%', 'Pre-Game Away Win Probability':f'{away_win_prob*100:.2f}%', 'Home Record':home_team_obj.record, 'Away Record':away_team_obj.record}])], ignore_index=True)
-            elif games['gameState'] == 'FUT': # pre-game
-                today_games_df = pd.concat([today_games_df, pd.DataFrame.from_dict([{'GameID':games['id'], 'Game State':'Pre-Game', 'Home Team':team_id_dict[games['homeTeam']['id']], 'Home Goals':0, 'Away Goals':0, 'Away Team':team_id_dict[games['awayTeam']['id']], 'Pre-Game Home Win Probability':f'{home_win_prob*100:.2f}%', 'Pre-Game Away Win Probability':f'{away_win_prob*100:.2f}%', 'Home Record':home_team_obj.record, 'Away Record':away_team_obj.record}])], ignore_index=True)
-            else: # in progress
-                try:
-                    today_games_df = pd.concat([today_games_df, pd.DataFrame.from_dict([{'GameID':games['id'], 'Game State':f"Period {games['periodDescriptor']['number']}", 'Home Team':team_id_dict[games['homeTeam']['id']], 'Home Goals':games['homeTeam']['score'], 'Away Goals':games['awayTeam']['score'], 'Away Team':team_id_dict[games['awayTeam']['id']], 'Pre-Game Home Win Probability':f'{home_win_prob*100:.2f}%', 'Pre-Game Away Win Probability':f'{away_win_prob*100:.2f}%', 'Home Record':home_team_obj.record, 'Away Record':away_team_obj.record}])], ignore_index=True)
-                except KeyError:
-                    today_games_df = pd.concat([today_games_df, pd.DataFrame.from_dict([{'GameID':games['id'], 'Game State':f"Period {games['periodDescriptor']['number']}", 'Home Team':team_id_dict[games['homeTeam']['id']], 'Home Goals':0, 'Away Goals':0, 'Away Team':team_id_dict[games['awayTeam']['id']], 'Pre-Game Home Win Probability':f'{home_win_prob*100:.2f}%', 'Pre-Game Away Win Probability':f'{away_win_prob*100:.2f}%', 'Home Record':home_team_obj.record, 'Away Record':away_team_obj.record}])], ignore_index=True)
+            home_win_prob = calc_prob(home_team_obj, away_team_obj, param) * 100
+            away_win_prob = 100 - home_win_prob
 
+            game_state = game['gameState']
+            if game_state == 'OFF':
+                game_state_desc = 'Final'
+                home_goals = game['homeTeam']['score']
+                away_goals = game['awayTeam']['score']
+            elif game_state == 'FUT':
+                game_state_desc = 'Pre-Game'
+                home_goals = 0
+                away_goals = 0
+            else:
+                game_state_desc = f"Period {game.get('periodDescriptor', {}).get('number', '')}"
+                home_goals = game['homeTeam'].get('score', 0)
+                away_goals = game['awayTeam'].get('score', 0)
+
+            row = {
+                'GameID': game['id'],
+                'Game State': game_state_desc,
+                'Home Team': home_team_name,
+                'Home Goals': home_goals,
+                'Away Goals': away_goals,
+                'Away Team': away_team_name,
+                'Pre-Game Home Win Probability': f'{home_win_prob:.2f}%',
+                'Pre-Game Away Win Probability': f'{away_win_prob:.2f}%',
+                'Home Record': home_team_obj.record,
+                'Away Record': away_team_obj.record
+            }
+            rows.append(row)
+
+        today_games_df = pd.DataFrame(rows, columns=columns)
         today_games_df.index += 1
-
-    except IndexError:
+    except (IndexError, KeyError):
         today_games_df = None
         date = None
 
     return date, today_games_df
 
 def custom_game_selector(param, team_list):
-    valid = False
-    while valid == False:
-        home_team_input = input('Enter the home team: ')
-        for team in team_list:
-            if home_team_input.strip().lower() == team.name.lower().replace('é','e'):
-                home_team = team
-                valid = True
-        if valid == False:
+    def get_team(prompt):
+        while True:
+            team_input = input(prompt).strip().lower()
+            for team in team_list:
+                if team_input == team.name.lower().replace('é', 'e'):
+                    return team
             print('Sorry, I am not familiar with this team. Maybe check your spelling?')
 
-    valid = False
-    while valid == False:
-        away_team_input = input('Enter the away team: ')
-        for team in team_list:
-            if away_team_input.strip().lower() == team.name.lower().replace('é','e'):
-                away_team = team
-                valid = True
-        if valid == False:
-            print('Sorry, I am not familiar with this team. Maybe check your spelling?')
+    home_team = get_team('Enter the home team: ')
+    away_team = get_team('Enter the away team: ')
 
-    game_probability_df = pd.DataFrame(columns = ['', home_team.name, away_team.name])
+    data = []
+    columns = ['', home_team.name, away_team.name]
 
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Rating', home_team.name:f'{home_team.power:.3f}', away_team.name:f'{away_team.power:.3f}'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Record', home_team.name:f'{home_team.record}', away_team.name:f'{away_team.record}'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Point PCT', home_team.name:f'{home_team.pct:.3f}', away_team.name:f'{away_team.pct:.3f}'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Win Probability', home_team.name:f'{calc_prob(home_team, away_team, param)*100:.2f}%', away_team.name:f'{(calc_prob(away_team, home_team, param))*100:.2f}%'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Win by 1 Goal', home_team.name:f'{calc_spread(home_team, away_team, param, 0, 1.5)*100:.2f}%', away_team.name:f'{calc_spread(away_team, home_team, param, 0, 1.5)*100:.2f}%'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Win by 2 Goals', home_team.name:f'{calc_spread(home_team, away_team, param, 1.5, 2.5)*100:.2f}%', away_team.name:f'{calc_spread(away_team, home_team, param, 1.5, 2.5)*100:.2f}%'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Win by 3 Goals', home_team.name:f'{calc_spread(home_team, away_team, param, 2.5, 3.5)*100:.2f}%', away_team.name:f'{calc_spread(away_team, home_team, param, 2.5, 3.5)*100:.2f}%'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Win by 4 Goals', home_team.name:f'{calc_spread(home_team, away_team, param, 3.5, 4.5)*100:.2f}%', away_team.name:f'{calc_spread(away_team, home_team, param, 3.5, 4.5)*100:.2f}%'}])], ignore_index=True)
-    game_probability_df = pd.concat([game_probability_df, pd.DataFrame.from_dict([{'':'Win by 5+ Goals', home_team.name:f'{calc_spread(home_team, away_team, param, 4.5, "inf")*100:.2f}%', away_team.name:f'{calc_spread(away_team, home_team, param, 4.5, "inf")*100:.2f}%'}])], ignore_index=True)
-    game_probability_df = game_probability_df.set_index('')
+    data.append({'': 'Rating', home_team.name: f'{home_team.power:.3f}', away_team.name: f'{away_team.power:.3f}'})
+    data.append({'': 'Record', home_team.name: home_team.record, away_team.name: away_team.record})
+    data.append({'': 'Point PCT', home_team.name: f'{home_team.pct:.3f}', away_team.name: f'{away_team.pct:.3f}'})
+    data.append({'': 'Win Probability', home_team.name: f'{calc_prob(home_team, away_team, param)*100:.2f}%', away_team.name: f'{calc_prob(away_team, home_team, param)*100:.2f}%'})
+
+    spreads = [
+        (0, 1.5, 'Win by 1'),
+        (1.5, 2.5, 'Win by 2'),
+        (2.5, 3.5, 'Win by 3'),
+        (3.5, 4.5, 'Win by 4'),
+        (4.5, 'inf', 'Win by 5+')
+    ]
+
+    for lower, upper, label in spreads:
+        data.append({
+            '': label,
+            home_team.name: f'{calc_spread(home_team, away_team, param, lower, upper)*100:.2f}%',
+            away_team.name: f'{calc_spread(away_team, home_team, param, lower, upper)*100:.2f}%'
+        })
+
+    game_probability_df = pd.DataFrame(data, columns=columns)
+    game_probability_df.set_index('', inplace=True)
 
     return home_team, away_team, game_probability_df
 
 def get_upsets(total_game_list):
-    upset_df = pd.DataFrame(columns = ['Home Team', 'Home Goals', 'Away Goals', 'Away Team', 'Date', 'xGD', 'GD', 'Upset Rating'])
+    data = []
 
     for game in total_game_list:
-        expected_score_diff = game.home_team.power - game.away_team.power #home - away
-        actaul_score_diff = game.home_score - game.away_score
-        upset_rating = actaul_score_diff - expected_score_diff #Positive score is an upset by the home team. Negative scores are upsets by the visiting team.
+        expected_score_diff = game.home_team.power - game.away_team.power
+        actual_score_diff = game.home_score - game.away_score
+        upset_rating = abs(actual_score_diff - expected_score_diff)
 
-        upset_df = pd.concat([upset_df, pd.DataFrame.from_dict([{'Home Team':game.home_team.name, 'Home Goals':int(game.home_score), 'Away Goals':int(game.away_score), 'Away Team':game.away_team.name, 'Date':game.date,'xGD':f'{expected_score_diff:.2f}', 'GD':int(actaul_score_diff), 'Upset Rating':f'{abs(upset_rating):.2f}'}])], ignore_index=True)
+        data.append({
+            'Home Team': game.home_team.name,
+            'Home Goals': int(game.home_score),
+            'Away Goals': int(game.away_score),
+            'Away Team': game.away_team.name,
+            'Date': game.date,
+            'xGD': f'{expected_score_diff:.2f}',
+            'GD': int(actual_score_diff),
+            'Upset Rating': f'{upset_rating:.2f}'
+        })
 
-    upset_df = upset_df.sort_values(by=['Upset Rating'], ascending=False)
-    upset_df = upset_df.reset_index(drop=True)
+    upset_df = pd.DataFrame(data)
+    upset_df.sort_values(by=['Upset Rating'], ascending=False, inplace=True)
+    upset_df.reset_index(drop=True, inplace=True)
     upset_df.index += 1
     return upset_df
 
 def get_best_performances(total_game_list):
-    performance_df = pd.DataFrame(columns = ['Team', 'Opponent', 'GF', 'GA', 'Date', 'xGD', 'Performance'])
+    data = []
 
     for game in total_game_list:
-        performance_df = pd.concat([performance_df, pd.DataFrame.from_dict([{'Team':game.home_team.name, 'Opponent':game.away_team.name, 'GF':int(game.home_score), 'GA':int(game.away_score), 'Date':game.date, 'xGD':f'{game.home_team.power-game.away_team.power:.2f}', 'Performance':round(game.away_team.power+game.home_score-game.away_score,2)}])], ignore_index = True)
-        performance_df = pd.concat([performance_df, pd.DataFrame.from_dict([{'Team':game.away_team.name, 'Opponent':game.home_team.name, 'GF':int(game.away_score), 'GA':int(game.home_score), 'Date':game.date, 'xGD':f'{game.away_team.power-game.home_team.power:.2f}', 'Performance':round(game.home_team.power+game.away_score-game.home_score,2)}])], ignore_index = True)
+        for team, opponent, gf, ga in [
+            (game.home_team, game.away_team, game.home_score, game.away_score),
+            (game.away_team, game.home_team, game.away_score, game.home_score)
+        ]:
+            performance = opponent.power + gf - ga
+            data.append({
+                'Team': team.name,
+                'Opponent': opponent.name,
+                'GF': int(gf),
+                'GA': int(ga),
+                'Date': game.date,
+                'xGD': f'{team.power - opponent.power:.2f}',
+                'Performance': round(performance, 2)
+            })
 
-    performance_df = performance_df.sort_values(by=['Performance'], ascending=False)
-    performance_df = performance_df.reset_index(drop=True)
+    performance_df = pd.DataFrame(data)
+    performance_df.sort_values(by=['Performance'], ascending=False, inplace=True)
+    performance_df.reset_index(drop=True, inplace=True)
     performance_df.index += 1
     return performance_df
 
 def get_team_consistency(team_list):
-    consistency_df = pd.DataFrame(columns = ['Team', 'Rating', 'Consistency (z-Score)'])
+    data = []
 
     for team in team_list:
-        consistency_df = pd.concat([consistency_df, pd.DataFrame.from_dict([{'Team':team.name, 'Rating':f'{team.power:.2f}', 'Consistency (z-Score)':team.calc_consistency()}])], ignore_index = True)
+        variance = team.calc_consistency()
+        data.append({
+            'Team': team.name,
+            'Rating': f'{team.power:.2f}',
+            'Consistency (z-Score)': variance
+        })
 
-    consistency_df['Consistency (z-Score)'] = consistency_df['Consistency (z-Score)'].apply(lambda x: (x-consistency_df['Consistency (z-Score)'].mean())/-consistency_df['Consistency (z-Score)'].std())
-
-    consistency_df = consistency_df.sort_values(by=['Consistency (z-Score)'], ascending=False)
-    consistency_df = consistency_df.reset_index(drop=True)
+    consistency_df = pd.DataFrame(data)
+    mean_var = consistency_df['Consistency (z-Score)'].mean()
+    std_var = consistency_df['Consistency (z-Score)'].std()
+    consistency_df['Consistency (z-Score)'] = ((consistency_df['Consistency (z-Score)'] - mean_var) / -std_var).round(2)
+    consistency_df.sort_values(by=['Consistency (z-Score)'], ascending=False, inplace=True)
+    consistency_df.reset_index(drop=True, inplace=True)
     consistency_df.index += 1
-    consistency_df['Consistency (z-Score)'] = consistency_df['Consistency (z-Score)'].apply(lambda x: f'{x:.2f}')
     return consistency_df
 
 def team_game_log(team_list):
-    valid = False
-    while valid == False:
-        input_team = input('Enter a team: ')
-        for team_obj in team_list:
-            if input_team.strip().lower() == team_obj.name.lower().replace('é','e'):
-                team = team_obj
-                valid = True
-        if valid == False:
-            print('Sorry, I am not familiar with this team. Maybe check your spelling?')
+    input_team = input('Enter a team: ').strip().lower()
+    team = next((t for t in team_list if t.name.lower().replace('é', 'e') == input_team), None)
+    if not team:
+        print('Sorry, I am not familiar with this team. Maybe check your spelling?')
+        return None, None
 
-    game_log_df = pd.DataFrame(columns = ['Date', 'Opponent', 'GF', 'GA', 'Performance'])
+    data = []
+
     for game in team.team_game_list:
         if team == game.home_team:
             goals_for = game.home_score
@@ -422,42 +469,63 @@ def team_game_log(team_list):
             opponent = game.home_team
             goals_against = game.home_score
 
-        game_log_df = pd.concat([game_log_df, pd.DataFrame.from_dict([{'Date':game.date, 'Opponent':opponent.name, 'GF':int(goals_for), 'GA':int(goals_against), 'Performance':round(opponent.power + goals_for - goals_against,2)}])], ignore_index = True)
+        performance = opponent.power + goals_for - goals_against
+        data.append({
+            'Date': game.date,
+            'Opponent': opponent.name,
+            'GF': int(goals_for),
+            'GA': int(goals_against),
+            'Performance': round(performance, 2)
+        })
 
+    game_log_df = pd.DataFrame(data)
     game_log_df.index += 1
     return team, game_log_df
 
 def get_team_prob_breakdown(team_list, param):
-    valid = False
-    while valid == False:
-        input_team = input('Enter a team: ')
-        for team_obj in team_list:
-            if input_team.strip().lower() == team_obj.name.lower().replace('é','e'):
-                team = team_obj
-                valid = True
-        if valid == False:
-            print('Sorry, I am not familiar with this team. Maybe check your spelling?')
+    input_team = input('Enter a team: ').strip().lower()
+    team = next((t for t in team_list if t.name.lower().replace('é', 'e') == input_team), None)
+    if not team:
+        print('Sorry, I am not familiar with this team. Maybe check your spelling?')
+        return None, None
 
-    prob_breakdown_df = pd.DataFrame(columns = ['Opponent', 'Record', 'PCT', 'Win Probability', 'Lose by 5+', 'Lose by 4', 'Lose by 3', 'Lose by 2', 'Lose by 1', 'Win by 1', 'Win by 2', 'Win by 3', 'Win by 4', 'Win by 5+'])
+    data = []
+
     for opp_team in team_list:
-        if opp_team is not team:
-            prob_breakdown_df = pd.concat([prob_breakdown_df, pd.DataFrame.from_dict([{'Opponent': opp_team.name,
+        if opp_team == team:
+            continue
+
+        win_prob = calc_prob(team, opp_team, param) * 100
+        spreads = [
+            ('-inf', -4.5, 'Lose by 5+'),
+            (-4.5, -3.5, 'Lose by 4'),
+            (-3.5, -2.5, 'Lose by 3'),
+            (-2.5, -1.5, 'Lose by 2'),
+            (-1.5, 0, 'Lose by 1'),
+            (0, 1.5, 'Win by 1'),
+            (1.5, 2.5, 'Win by 2'),
+            (2.5, 3.5, 'Win by 3'),
+            (3.5, 4.5, 'Win by 4'),
+            (4.5, 'inf', 'Win by 5+')
+        ]
+
+        spread_probs = {}
+        for lower, upper, label in spreads:
+            prob = calc_spread(team, opp_team, param, lower, upper) * 100
+            spread_probs[label] = f'{prob:.2f}%'
+
+        row = {
+            'Opponent': opp_team.name,
             'Record': opp_team.record,
             'PCT': f'{opp_team.calc_pct():.3f}',
-            'Win Probability':f'{calc_prob(team, opp_team, param)*100:.2f}%',
-            'Lose by 5+': f'{calc_spread(team, opp_team, param, "-inf", -4.5)*100:.2f}%',
-            'Lose by 4': f'{calc_spread(team, opp_team, param, -4.5, -3.5)*100:.2f}%',
-            'Lose by 3': f'{calc_spread(team, opp_team, param, -3.5, -2.5)*100:.2f}%',
-            'Lose by 2': f'{calc_spread(team, opp_team, param, -2.5, -1.5)*100:.2f}%',
-            'Lose by 1': f'{calc_spread(team, opp_team, param, -1.5, 0)*100:.2f}%',
-            'Win by 1': f'{calc_spread(team, opp_team, param, 0, 1.5)*100:.2f}%',
-            'Win by 2': f'{calc_spread(team, opp_team, param, 1.5, 2.5)*100:.2f}%',
-            'Win by 3': f'{calc_spread(team, opp_team, param, 2.5, 3.5)*100:.2f}%',
-            'Win by 4': f'{calc_spread(team, opp_team, param, 3.5, 4.5)*100:.2f}%',
-            'Win by 5+': f'{calc_spread(team, opp_team, param, 4.5, "inf")*100:.2f}%'}])], ignore_index = True)
+            'Win Probability': f'{win_prob:.2f}%'
+        }
+        row.update(spread_probs)
+        data.append(row)
 
-    prob_breakdown_df = prob_breakdown_df.set_index('Opponent')
-    prob_breakdown_df = prob_breakdown_df.sort_values(by=['PCT'], ascending=False)
+    prob_breakdown_df = pd.DataFrame(data)
+    prob_breakdown_df.set_index('Opponent', inplace=True)
+    prob_breakdown_df.sort_values(by=['PCT'], ascending=False, inplace=True)
     return team, prob_breakdown_df
 
 def extra_menu(total_game_list, team_list, param):
@@ -470,223 +538,155 @@ def extra_menu(total_game_list, team_list, param):
     5. Team Probability Big Board
     6. Exit to Main Menu""")
 
-        valid = False
-        while valid == False:
-            user_option = input('Enter a menu option: ')
-            try:
-                user_option = int(user_option)
-                if user_option >= 1 and user_option <= 6:
-                    print()
-                    valid = True
-                else:
-                    raise ValueError
-            except ValueError:
-                print(f'Your option "{user_option}" is invalid.', end=' ')
-
-        if user_option == 1:
+        user_option = input('Enter a menu option: ').strip()
+        if user_option == '1':
             upsets = get_upsets(total_game_list)
             print(upsets)
             download_csv_option(upsets, 'biggest_upsets')
-        elif user_option == 2:
+        elif user_option == '2':
             performances = get_best_performances(total_game_list)
             print(performances)
             download_csv_option(performances, 'best_performances')
-        elif user_option == 3:
+        elif user_option == '3':
             consistency = get_team_consistency(team_list)
             print(consistency)
             download_csv_option(consistency, 'most_consistent_teams')
-        elif user_option == 4:
+        elif user_option == '4':
             team, game_log = team_game_log(team_list)
-            print(game_log)
-            download_csv_option(game_log, f'{team.name.replace(" ", "_").lower()}_game_log')
-        elif user_option == 5:
-            team, team_probabilities = get_team_prob_breakdown(team_list, param)
-            print(team_probabilities)
-            download_csv_option(team_probabilities, f'{team.name.replace(" ", "_").lower()}_prob_breakdown')
-        elif user_option == 6:
-            pass
-
-        return
+            if team and game_log is not None:
+                print(game_log)
+                download_csv_option(game_log, f'{team.name.replace(" ", "_").lower()}_game_log')
+        elif user_option == '5':
+            team, prob_breakdown_df = get_team_prob_breakdown(team_list, param)
+            if team and prob_breakdown_df is not None:
+                print(prob_breakdown_df)
+                download_csv_option(prob_breakdown_df, f'{team.name.replace(" ", "_").lower()}_prob_breakdown')
+        elif user_option == '6':
+            break
+        else:
+            print(f'Invalid option: {user_option}')
+        print()
 
 def moneyline_to_proba(moneyline):
+    moneyline = float(moneyline)
     if moneyline < 0:
         return -moneyline / (-moneyline + 100)
     else:
         return 100 / (moneyline + 100)
 
-
 def calculate_ev(model_prob, vegas_prob):
-    """
-    Calculate the Expected Value (EV) for betting based on the provided probabilities.
-
-    Parameters:
-    - model_prob: Model's probability of the team (home or away) winning.
-    - vegas_prob: Sportsbook's implied probability based on the odds.
-
-    Returns:
-    - EV for betting on the team.
-    """
     potential_profit = (1 / vegas_prob) - 1
     prob_lose = 1 - model_prob
-    ev = model_prob * potential_profit - prob_lose * 1  # Assuming a 1 unit bet
-    
+    ev = model_prob * potential_profit - prob_lose * 1
     return ev
 
-def fetch_odds_data(date, predict):
+def fetch_odds_data(date):
     base_url = f"https://www.oddsshark.com/api/scores/nhl/{date}?_format=json"
     headers = {
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://www.oddsshark.com/nhl/scores',
-        'Sec-Ch-Ua': '"Chromium";v="118", "Microsoft Edge";v="118", "Not=A?Brand";v="99"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 Edg/118.0.2088.44'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
     response = requests.get(base_url, headers=headers)
 
     if response.status_code == 200:
         data = response.json()
-        df = extract_team_data(data, predict)
+        df = extract_team_data(data)
         df['Date'] = date
-        df.to_csv(f"odds_data_{date}.csv", index=False)
         return df
     else:
         print(f"Failed to fetch data for date: {date}")
         return None
 
-def extract_team_data(json_data, predict):
+def extract_team_data(json_data):
     extracted_data = []
-    for game in json_data['scores']:
-        game_data = {}
-        
+    for game in json_data.get('scores', []):
         home_team = game['teams']['home']
         away_team = game['teams']['away']
-        game_data['Home Name'] = home_team['names']['name']
-        if game_data['Home Name'] == 'Montreal Canadiens':
-            game_data['Home Name'] = 'Montréal Canadiens'
-        game_data['Home MoneyLine'] = home_team['moneyLine']
-        game_data['Home Spread Price'] = home_team['spreadPrice']
-        game_data['Home Score'] = home_team['score']
-        game_data['Home Votes'] = home_team['votes']
-        game_data['Home Spread'] = home_team['spread']
-
-        if not predict:
-            game_data['won_game'] = home_team['score'] > away_team['score']
-        
-        game_data['Away Name'] = away_team['names']['name']
-        if game_data['Away Name'] == 'Montreal Canadiens':
-            game_data['Away Name'] = 'Montréal Canadiens'
-        game_data['Away MoneyLine'] = away_team['moneyLine']
-        game_data['Away Spread Price'] = away_team['spreadPrice']
-        game_data['Away Score'] = away_team['score']
-        game_data['Away Votes'] = away_team['votes']
-        game_data['Away Spread'] = away_team['spread']
-
-        game_data['Under Price'] = game['underPrice']
-        game_data['Over Price'] = game['overPrice']
-        game_data['Over Votes'] = game['overVotes']
-        game_data['Under Votes'] = game['underVotes']
-        game_data['Total'] = game['total']
-        if not predict:
-            game_data['Totals'] = home_team['score'] + away_team['score']
-        game_data['Arena'] = game['stadium']
-        
+        game_data = {
+            'Home Name': home_team['names']['name'],
+            'Home MoneyLine': home_team['moneyLine'],
+            'Home Spread Price': home_team['spreadPrice'],
+            'Home Score': home_team.get('score', 0),
+            'Home Votes': home_team.get('votes', 0),
+            'Home Spread': home_team['spread'],
+            'Away Name': away_team['names']['name'],
+            'Away MoneyLine': away_team['moneyLine'],
+            'Away Spread Price': away_team['spreadPrice'],
+            'Away Score': away_team.get('score', 0),
+            'Away Votes': away_team.get('votes', 0),
+            'Away Spread': away_team['spread'],
+            'Under Price': game['underPrice'],
+            'Over Price': game['overPrice'],
+            'Over Votes': game.get('overVotes', 0),
+            'Under Votes': game.get('underVotes', 0),
+            'Total': game['total'],
+            'Arena': game.get('stadium', '')
+        }
         extracted_data.append(game_data)
 
     df = pd.DataFrame(extracted_data)
-    return df
-
-def convert_to_dataframe(data):
-    # Normalize the nested structure into a flat DataFrame
-    df = json_normalize(data, sep='_')
+    df['Home Name'].replace({'Montreal Canadiens': 'Montréal Canadiens'}, inplace=True)
+    df['Away Name'].replace({'Montreal Canadiens': 'Montréal Canadiens'}, inplace=True)
     return df
 
 def merge_odds_and_projections(odds_df, projections_df):
     decimal_places = 3
-    
+
     merged_df = pd.merge(
-        odds_df, 
+        odds_df,
         projections_df,
         left_on=['Home Name', 'Away Name'],
         right_on=['Home Team', 'Away Team'],
         how='inner'
     )
-    
-    # Select only the specified columns
-    merged_df = merged_df[
-        ['Date','Home Name', 'Away Name', 'Home MoneyLine', 'Away MoneyLine',
-         'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']
-    ]
 
-    cols_to_convert = ['Home MoneyLine', 'Away MoneyLine']
+    merged_df = merged_df[[
+        'Date', 'Home Name', 'Away Name', 'Home MoneyLine', 'Away MoneyLine',
+        'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability'
+    ]]
 
-    for col in cols_to_convert:
+    for col in ['Home MoneyLine', 'Away MoneyLine']:
         merged_df[col] = merged_df[col].apply(moneyline_to_proba)
 
-    merged_df['Pre-Game Away Win Probability'] = merged_df['Pre-Game Away Win Probability'].str.rstrip('%').astype(float)
-    merged_df['Pre-Game Home Win Probability'] = merged_df['Pre-Game Home Win Probability'].str.rstrip('%').astype(float)
+    for col in ['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']:
+        merged_df[col] = merged_df[col].str.rstrip('%').astype(float) / 100
 
-    merged_df['Pre-Game Away Win Probability'] = pd.to_numeric(merged_df['Pre-Game Away Win Probability'], errors='coerce')
+    merged_df['Home EV'] = merged_df.apply(
+        lambda x: calculate_ev(x['Pre-Game Home Win Probability'], x['Home MoneyLine']), axis=1) * 100
+    merged_df['Away EV'] = merged_df.apply(
+        lambda x: calculate_ev(x['Pre-Game Away Win Probability'], x['Away MoneyLine']), axis=1) * 100
 
-    merged_df['Pre-Game Home Win Probability'] = pd.to_numeric(merged_df['Pre-Game Home Win Probability'], errors='coerce')
+    merged_df['Pre-Game Home Win Probability'] *= 100
+    merged_df['Pre-Game Away Win Probability'] *= 100
 
-    merged_df['Pre-Game Away Win Probability'] = round(merged_df['Pre-Game Away Win Probability']/100, decimal_places)
-    merged_df['Pre-Game Home Win Probability'] = round(merged_df['Pre-Game Home Win Probability']/100, decimal_places)
-
-    # Calculate Expected Value (EV) for Away Team
-    merged_df['Away EV'] = merged_df.apply(lambda x: calculate_ev(x['Pre-Game Away Win Probability'], x['Away MoneyLine']), axis=1)
-
-    # Calculate Expected Value (EV) for Home Team
-    merged_df['Home EV'] = merged_df.apply(lambda x: calculate_ev(x['Pre-Game Home Win Probability'], x['Home MoneyLine']), axis=1)
-
-    merged_df['Pre-Game Away Win Probability'] = round(merged_df['Pre-Game Away Win Probability'] * 100,1)
-
-    merged_df['Pre-Game Home Win Probability'] = round(merged_df['Pre-Game Home Win Probability'] * 100,1)
-
-    merged_df['Home EV'] = merged_df['Home EV'] * 100
-
-    merged_df['Home EV'] = round(merged_df['Home EV'], 1)
-
-    merged_df['Away EV'] = merged_df['Away EV'] * 100
-
-    merged_df['Away EV'] = round(merged_df['Away EV'], 1)
+    merged_df[['Home EV', 'Away EV']] = merged_df[['Home EV', 'Away EV']].round(1)
+    merged_df[['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']] = merged_df[
+        ['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']].round(1)
 
     merged_df.drop(columns=['Home MoneyLine', 'Away MoneyLine'], inplace=True)
 
-    #merged_df = convert_to_dataframe(merged_df)
-
-    # Use credentials to create a client to interact with the Google Drive API
+    # Google Sheets Integration
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
     client = gspread.authorize(creds)
 
-    # Open the spreadsheet by its key
     spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
     spreadsheet = client.open_by_key(spreadsheet_id)
 
     sheet_name = 'BoomerModel'
-    
-    # Select the first sheet
     sheet = spreadsheet.worksheet(sheet_name)
-
-    # Clear existing data
-    #sheet.clear()
 
     # Append headers if the first row is empty
     if not sheet.row_values(1):
-        sheet.append_row(merged_df.columns.tolist())  # Add headers
+        sheet.append_row(merged_df.columns.tolist())
 
-    # Convert DataFrame to a list of lists for the data rows
     data = merged_df.values.tolist()
+    sheet.append_rows(data)
 
-    # Append the data rows to the sheet
-    sheet.append_rows(data)  # Efficiently append the rows
-
-        
     return merged_df
 
 def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, total_game_list, team_list, date):
-    date = (datetime.today() + timedelta(days=0)).strftime('%Y-%m-%d')
     while True:
         print("""--MAIN MENU--
     1. View Power Rankings
@@ -697,46 +697,39 @@ def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, to
     6. Extra Options
     7. Quit""")
 
-        valid = False
-        while valid == False:
-            user_option = input('Enter a menu option: ')
-            try:
-                user_option = int(user_option)
-                if user_option >= 1 and user_option <= 7:
-                    print()
-                    valid = True
-                else:
-                    raise ValueError
-            except ValueError:
-                print(f'Your option "{user_option}" is invalid.', end=' ')
+        user_option = input('Enter a menu option: ').strip()
 
-        if user_option == 1:
+        if user_option == '1':
             print(power_df)
             download_csv_option(power_df, 'power_rankings')
-        elif user_option == 2:
+        elif user_option == '2':
             if today_games_df is not None:
-                odds_df = fetch_odds_data(date, True)
-                merged_df = merge_odds_and_projections(odds_df, today_games_df)
-                print(today_games_df)
+                odds_df = fetch_odds_data(date)
+                if odds_df is not None:
+                    merged_df = merge_odds_and_projections(odds_df, today_games_df)
+                    print(merged_df)
+                else:
+                    print("No odds data available.")
                 download_csv_option(today_games_df, f'{date}_games')
             else:
                 print('There are no games today!')
-        elif user_option == 3:
+        elif user_option == '3':
             home_team, away_team, custom_game_df = custom_game_selector(param, team_list)
             print(custom_game_df)
             download_csv_option(custom_game_df, f'{home_team.name.replace(" ", "_").lower()}_vs_{away_team.name.replace(" ", "_").lower()}_game_probabilities')
-        elif user_option == 4:
+        elif user_option == '4':
             model_performance(xpoints, ypoints, param)
-        elif user_option == 5:
+        elif user_option == '5':
             print(f'Computation Time: {computation_time:.2f} seconds')
             print(f'Games Scraped: {len(total_game_list)}')
             print(f'Rate: {len(total_game_list)/computation_time:.1f} games/second')
-        elif user_option == 6:
+        elif user_option == '6':
             extra_menu(total_game_list, team_list, param)
-        elif user_option == 7:
-            return
-
-        input('Press ENTER to continue\t\t')
+        elif user_option == '7':
+            break
+        else:
+            print(f'Invalid option: {user_option}')
+        input('Press ENTER to continue')
         print()
 
 def main():
@@ -750,9 +743,8 @@ def main():
     xpoints, ypoints, param = logistic_regression(total_game_list)
     date, today_games_df = get_todays_games(param, team_list, team_id_dict)
 
-    computation_time = time.time()-start_time
+    computation_time = time.time() - start_time
     menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, total_game_list, team_list, date)
 
 if __name__ == '__main__':
     main()
-
