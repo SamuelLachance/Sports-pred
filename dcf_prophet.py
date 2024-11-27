@@ -1972,65 +1972,6 @@ def process_ticker(TICKER, excel_path):
     print(f"$$Real value per share$$ : ${real_value}")
 
     point_estimate_describer(base_case_valuation)
-
-##    df_valuation = monte_carlo_valuator_multi_phase(
-##        risk_free_rate = ot.Normal(float(risk_free_rate1), 0.002),
-##        ERP = ot.Normal(float(ERP1), 0.001),
-##        equity_value = ot.Triangular(float(equity_value1 - 6), float(equity_value1), float(equity_value1 + 6)),  # Allowing a little variation
-##        debt_value = ot.Triangular(float(debt_value1 - 0.3), float(debt_value1), float(debt_value1 + 0.3)),
-##        unlevered_beta = ot.Triangular(float(unlevered_beta1 - 0.1), float(unlevered_beta1), float(unlevered_beta1 + 0.1)),
-##        terminal_unlevered_beta = ot.Triangular(float(terminal_unlevered_beta1 - 0.1), float(terminal_unlevered_beta1), float(terminal_unlevered_beta1 + 0.1)),
-##        year_beta_begins_to_converge_to_terminal_beta = ot.Uniform(float(year_beta_begins_to_converge_to_terminal_beta1), float(year_beta_begins_to_converge_to_terminal_beta1 + 1)),
-##        current_pretax_cost_of_debt = ot.Triangular(float(current_pretax_cost_of_debt1 - 0.003), float(current_pretax_cost_of_debt1), float(current_pretax_cost_of_debt1 + 0.003)),
-##        terminal_pretax_cost_of_debt = ot.Triangular(float(terminal_pretax_cost_of_debt1 - 0.003), float(terminal_pretax_cost_of_debt1), float(terminal_pretax_cost_of_debt1 + 0.003)),
-##        year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt = ot.Uniform(float(year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1), float(year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1 + 1)),
-##        current_effective_tax_rate = ot.Triangular(float(current_effective_tax_rate1 - 0.01), float(current_effective_tax_rate1), float(current_effective_tax_rate1 + 0.01)),
-##        marginal_tax_rate = ot.Triangular(float(marginal_tax_rate1 - 0.02), float(marginal_tax_rate1), float(marginal_tax_rate1 + 0.02)),
-##        year_effective_tax_rate_begin_to_converge_marginal_tax_rate = ot.Uniform(float(year_effective_tax_rate_begin_to_converge_marginal_tax_rate1), float(year_effective_tax_rate_begin_to_converge_marginal_tax_rate1 + 1)),
-##        revenue_base = ot.Triangular(float(revenue_base1 - 0.4), float(revenue_base1), float(revenue_base1 + 0.4)),
-##        revenue_growth_rate_cycle1_begin = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle1_begin1), scale= 0.032))),
-##        revenue_growth_rate_cycle1_end = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle1_end1), scale= 0.033))),
-##        length_of_cylcle1 = ot.Uniform(float(length_of_cylcle1_1), float(length_of_cylcle1_1 + 2)),
-##        revenue_growth_rate_cycle2_begin = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle2_begin1), scale= 0.034))),
-##        revenue_growth_rate_cycle2_end = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle2_end1), scale= 0.032))),
-##        length_of_cylcle2 = ot.Uniform(float(length_of_cylcle2_1), float(length_of_cylcle2_1 + 2)),
-##        revenue_growth_rate_cycle3_begin = ot.Distribution(ot.SciPyDistribution(scipy.stats.skewnorm(-2.9, loc= float(revenue_growth_rate_cycle3_begin1), scale= 0.024))),
-##        revenue_growth_rate_cycle3_end = ot.Normal(float(revenue_growth_rate_cycle3_end1), 0.002),
-##        length_of_cylcle3 = ot.Uniform(float(length_of_cylcle3_1), float(length_of_cylcle3_1 + 2)),
-##        revenue_convergance_periods_cycle1 = ot.Uniform(float(revenue_convergance_periods_cycle1_1), float(revenue_convergance_periods_cycle1_1 + 1)),
-##        revenue_convergance_periods_cycle2 = ot.Uniform(float(revenue_convergance_periods_cycle2_1), float(revenue_convergance_periods_cycle2_1 + 1)),
-##        revenue_convergance_periods_cycle3 = ot.Uniform(float(revenue_convergance_periods_cycle3_1), float(revenue_convergance_periods_cycle3_1 + 1)),
-##        current_sales_to_capital_ratio = ot.Triangular(float(current_sales_to_capital_ratio1 - 0.2), float(current_sales_to_capital_ratio1), float(current_sales_to_capital_ratio1 + 0.2)),
-##        terminal_sales_to_capital_ratio = ot.Triangular(float(terminal_sales_to_capital_ratio1 - 0.2), float(terminal_sales_to_capital_ratio1), float(terminal_sales_to_capital_ratio1 + 0.2)),
-##        year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital = ot.Uniform(float(year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1), float(year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1 + 1)),
-##        current_operating_margin = ot.Triangular(float(current_operating_margin1 - 0.005), float(current_operating_margin1), float(current_operating_margin1 + 0.005)),
-##        terminal_operating_margin = ot.Triangular(float(terminal_operating_margin1 - 0.02), float(terminal_operating_margin1), float(terminal_operating_margin1 + 0.02)),
-##        year_operating_margin_begins_to_converge_to_terminal_operating_margin = ot.Uniform(float(year_operating_margin_begins_to_converge_to_terminal_operating_margin1), float(year_operating_margin_begins_to_converge_to_terminal_operating_margin1 + 1)),
-##        additional_return_on_cost_of_capital_in_perpetuity = ot.Triangular(float(additional_return_on_cost_of_capital_in_perpetuity1 - 0.01), float(additional_return_on_cost_of_capital_in_perpetuity1), float(additional_return_on_cost_of_capital_in_perpetuity1 + 0.01)),
-##        cash_and_non_operating_asset = ot.Uniform(float(cash_and_non_operating_asset1 - 0.2), float(cash_and_non_operating_asset1 + 0.2)),
-##        asset_liquidation_during_negative_growth = ot.Uniform(float(asset_liquidation_during_negative_growth1 - 0.000000001), float(asset_liquidation_during_negative_growth1 + 0.000000001)),
-##        current_invested_capital = ot.Uniform(float(current_invested_capital - 0.1), float(current_invested_capital + 0.1)),
-##        sample_size= 20000,
-##        list_of_correlation_between_variables=[
-##            ['revenue_growth_rate_cycle3_end', 'risk_free_rate', 0.95],
-##            ['revenue_growth_rate_cycle3_end', 'terminal_pretax_cost_of_debt', 0.9],
-##            ['terminal_pretax_cost_of_debt', 'risk_free_rate', 0.9],
-##            ['ERP', 'revenue_growth_rate_cycle2_begin', 0.4],
-##            ['ERP', 'revenue_growth_rate_cycle2_end', 0.4],
-##            ['ERP', 'revenue_growth_rate_cycle3_begin', 0.4],
-##            ['additional_return_on_cost_of_capital_in_perpetuity', 'terminal_sales_to_capital_ratio', 0.25],
-##            ['additional_return_on_cost_of_capital_in_perpetuity', 'terminal_operating_margin', 0.5],
-##            ['terminal_sales_to_capital_ratio', 'terminal_operating_margin', 0.5],
-##        ]
-##    )
-##
-##    print(df_valuation.dtypes)
-##    print(df_valuation.head())
-##
-##
-##
-##    valuation_describer(df_valuation,
-##                    sharesOutstanding=number_of_share)
     
 
 # Read the CSV file
