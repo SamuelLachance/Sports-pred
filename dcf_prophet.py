@@ -1204,6 +1204,7 @@ def get_stocks_from_same_industry(ticker_symbol):
     """Fetch stocks from the same industry as the provided ticker."""
     # Get the sector of the given ticker using yfinance
     sector = get_industry_yfinance(ticker_symbol)
+    print(sector)
 
     if not sector:
         print(f"Could not find industry for {ticker_symbol}")
@@ -1223,6 +1224,7 @@ def get_stocks_from_same_industry(ticker_symbol):
         return None
 
     data = s.get_screeners(normalized_sector)
+    print(data)
 
     # Convert data to DataFrame for easier handling
     df = pd.DataFrame(data[normalized_sector]['quotes'])
@@ -1868,7 +1870,7 @@ def process_ticker(TICKER, excel_path):
 
     revenue_growth_rate_cycle3_begin1 = (revenue_growth_rate_cycle2_begin1 + ERP1)/2
 
-    revenue_growth_rate_cycle3_end1 = risk_free_rate1
+    revenue_growth_rate_cycle3_end1 = (revenue_growth_rate_cycle2_begin1 + ERP1 + risk_free_rate1)/3
 
     length_of_cylcle3_1 = 1 #estimate_cycle_length(revenue_growth_rate_cycle3_begin1, revenue_growth_rate_cycle3_end1)
 
@@ -1988,11 +1990,11 @@ if user_choice.lower() == 'all':
     for ticker in tickers:
         try:
             process_ticker(ticker, excel_path)
-            time.sleep(10)  # Normal delay between successful requests
+            time.sleep(30)  # Normal delay between successful requests
         except Exception as e:
             print(f"An error occurred while processing {ticker}: {e}")
             traceback.print_exc()
-            time.sleep(30)
+            time.sleep(60)
 else:
     # Process only the specified ticker
     if user_choice != 'all':
