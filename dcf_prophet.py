@@ -1156,39 +1156,26 @@ def valuation_describer(df_intc_valuation,sharesOutstanding):
 
 def convert_currency_yahoofin(src, dst, amount):
     symbol = f"{src}{dst}=X"
-
-
-    if src == dst :
-
+    if src == dst:
         return amount
-
     try:
         latest_data = si.get_data(symbol, interval="1m", start_date=datetime.now() - timedelta(days=2))
-
-        # Fill missing values with the last available value
         latest_data.fillna(method='ffill', inplace=True)
-
-        # Check if after filling, the data is still empty
         if latest_data.empty or pd.isna(latest_data.iloc[-1].close):
-            raise ValueError("Data retrieval was unsuccessful or incomplete. Please check the currency symbols or try again later.")
-
+            raise ValueError("Data retrieval was unsuccessful or incomplete.")
         last_updated_datetime = latest_data.index[-1].to_pydatetime()
         latest_price = latest_data.iloc[-1].close
-
         return float(latest_price) * float(amount)
-
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
 
 def get_sector_yfinance(ticker_symbol):
-    """Fetch the sector for a given ticker using yfinance."""
     ticker = yf.Ticker(ticker_symbol)
     info = ticker.info
     return info.get('sector', None)
 
 def get_industry_yfinance(ticker_symbol):
-    """Fetch the sector for a given ticker using yfinance."""
     ticker = yf.Ticker(ticker_symbol)
     info = ticker.info
     return info.get('industry', None)
@@ -1201,51 +1188,32 @@ def get_industry(ticker_symbol):
     return None
 
 def get_stocks_from_same_industry(ticker_symbol):
-    """Fetch stocks from the same industry as the provided ticker."""
-    # Get the sector of the given ticker using yfinance
     sector = get_industry_yfinance(ticker_symbol)
     print(sector)
-
     if not sector:
         print(f"Could not find industry for {ticker_symbol}")
         return None
-
-    # Normalize the sector string
-    # Replace one or more non-alphanumeric characters with a single underscore
     normalized_sector = re.sub(r'[^a-zA-Z0-9]+', '_', sector).lower()
-
-    # Initialize the screener from yahooquery
     s = Screener()
-
     print(f"Normalized Industry: {normalized_sector}")
-
     if normalized_sector not in s.available_screeners:
         print(f"No predefined screener available for sector: {normalized_sector}")
         return None
-
     data = s.get_screeners(normalized_sector)
     print(data)
-
-    # Convert data to DataFrame for easier handling
     df = pd.DataFrame(data[normalized_sector]['quotes'])
-
     return df
 
 def calculate_rolling_beta(stock_data, market_data, window_size):
-    # Use 'Close' column instead of 'Adj Close'
     stock_returns = stock_data['Close'].pct_change().dropna()
     market_returns = market_data['Close'].pct_change().dropna()
-
-    # Calculate rolling covariance and variance
     rolling_cov = stock_returns.rolling(window=window_size).cov(market_returns)
     rolling_var = market_returns.rolling(window=window_size).var()
-
-    # Calculate beta
     rolling_beta = rolling_cov / rolling_var
     return rolling_beta.dropna()
 
 def get_unlevered_beta(TICKER):
-    api_key = "435820a51119704ed53f7e7fb8a0cfec" # Example ticker
+    api_key = "435820a51119704ed53f7e7fb8a0cfec"
     test = f"https://financialmodelingprep.com/api/v3/quote/{TICKER}?apikey={api_key}"
     test2 = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{TICKER}?period=quarter&apikey={api_key}"
     test3 = f"https://financialmodelingprep.com/api/v3/profile/{TICKER}?apikey={api_key}"
@@ -1258,46 +1226,33 @@ def get_unlevered_beta(TICKER):
     data2 = response2.json()
     data3 = response3.json()
     data4 = response4.json()
-
-    if not data4 :
+    if not data4:
         return None
-    
     marketcap = data[0].get('marketCap')
     sharesOutstanding = data[0].get('sharesOutstanding')
     currency = data2[0].get('reportedCurrency')
     levered_beta = data3[0].get('beta')
-    
-    market_cap = convert_currency_yahoofin('USD' , currency, marketcap) # Use 'ticker', not 'TICKER'
+    market_cap = convert_currency_yahoofin('USD', currency, marketcap)
     debt_value = data2[0].get('totalDebt')
     equity_value = market_cap
     pretax_income = sum(item['incomeBeforeTax'] for item in data4[:4])
     income_tax_expense = sum(item['incomeTaxExpense'] for item in data4[:4])
-
-    # Ensure not dividing by zero
     if pretax_income == 0:
         effective_tax_rate = 0
     else:
         effective_tax_rate = income_tax_expense / pretax_income
-
-    # Restrict tax rate to [0, 1]
     T = min(max(effective_tax_rate, 0), 1)
-
     if pd.isna(debt_value) or debt_value == 0:
         return levered_beta
     else:
         X = debt_value / equity_value
     return levered_beta / (1 + ((1 - T) * X))
 
-
-
 def get_pretax_cost_of_debt(ticker):
-
-    api_key = "435820a51119704ed53f7e7fb8a0cfec" 
+    api_key = "435820a51119704ed53f7e7fb8a0cfec"
     base_url = "https://financialmodelingprep.com/api/v3"
-    
     balance_sheet_url = f"{base_url}/balance-sheet-statement/{ticker}?period=quarter&apikey={api_key}"
     income_statement_url = f"{base_url}/income-statement/{ticker}?period=quarter&apikey={api_key}"
-
     try:
         balance_sheet_response = requests.get(balance_sheet_url)
         income_statement_response = requests.get(income_statement_url)
@@ -1306,290 +1261,155 @@ def get_pretax_cost_of_debt(ticker):
     except requests.RequestException as e:
         print(f"Error fetching data: {e}")
         return None
-
     balance_sheet_data = balance_sheet_response.json()
     income_statement_data = income_statement_response.json()
-
     if not income_statement_data:
         return None
-
-    # Sum of the last four quarters to annualize the interest expense
     interest_expense = sum(item.get('interestExpense', 0) for item in income_statement_data[:4])
     total_debt = balance_sheet_data[0].get('totalDebt', 0)
-
     if total_debt == 0 or interest_expense == 0:
         return 0
-
-    # Calculate the cost of debt
     cost_of_debt = interest_expense / total_debt
-
     if cost_of_debt > 1.0:
         return 0
-
     return cost_of_debt
 
 def get_year_cost_of_debt_converges(ticker, comparable_tickers):
-    """Compute the number of years for the cost of debt to converge to the industry average."""
-
-    # Get the current pre-tax cost of debt for the given ticker
     current_pretax_cost_of_debt = get_pretax_cost_of_debt(ticker)
-
-    # Get the pre-tax cost of debt for each comparable ticker
     pretax_costs_of_debt = [get_pretax_cost_of_debt(ticker) for ticker in comparable_tickers]
-
-    # Remove invalid values
     valid_cost = [cost for cost in pretax_costs_of_debt if cost is not None and not math.isnan(cost)]
-
-    # Calculate the industry average pre-tax cost of debt
     industry_average_pretax_cost_of_debt = sum(valid_cost) / len(valid_cost)
-
-    # Estimate the terminal pre-tax cost of debt using a weighted average
     omega = 0.5
     terminal_pretax_cost_of_debt = omega * current_pretax_cost_of_debt + (1 - omega) * industry_average_pretax_cost_of_debt
-
-    # If the terminal cost is the same as the current cost, then convergence is immediate
     if terminal_pretax_cost_of_debt == current_pretax_cost_of_debt:
         return 0
-
-    # Calculate the annual change required to reach the terminal value
     annual_change = terminal_pretax_cost_of_debt - current_pretax_cost_of_debt
-
-    # Calculate the number of years required for convergence. Since we're assuming linear progression,
-    # this would be the difference between the terminal and current value divided by the annual change.
     years_until_convergence = (terminal_pretax_cost_of_debt - current_pretax_cost_of_debt) / annual_change
-
     return years_until_convergence
-
-
 
 def fetch_growth_estimate(ticker, current_revenue, replacement_value=0.05):
     api_key = "435820a51119704ed53f7e7fb8a0cfec"
     test1 = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}?apikey={api_key}"
     response1 = requests.get(test1)
     data1 = response1.json()
-    
     current_date = datetime.now().strftime("%Y-%m-%d")
     filtered_data = [entry for entry in data1 if entry['date'] > current_date]
-
     filtered_data.sort(key=lambda x: x['date'])
-
     closest_entry = filtered_data[0]
-    estimated_revenue_avg = closest_entry['estimatedRevenueAvg'] / 10**9 #closest_entry['estimatedRevenueHigh'] / 10**9
-    
-    # Calculate growth based on the difference between current revenue and estimated revenue
+    estimated_revenue_avg = closest_entry['estimatedRevenueAvg'] / 10**9
     growth1 = (estimated_revenue_avg - current_revenue) / current_revenue
-    growth1 = growth1*100
-    # Calculate 5-year growth using replacement value and average growth rate
+    growth1 = growth1 * 100
     growth5 = (replacement_value + (growth1 * 2)) / 3
-    
     return growth1, growth5
 
 def estimate_cycle_length(growth1, growth5):
-    """
-    Estimates the cycle length based on linear interpolation of the growth rate.
-    Args:
-    - growth1 (float): Initial growth rate at the beginning of the cycle (in %).
-    - growth5 (float): Growth rate at the end of the cycle (in %).
-
-    Returns:
-    - int: Estimated number of years the cycle will last.
-    """
-
-    # Assuming linear change in growth rate
     growth_rate_change_per_year = (growth5 - growth1) / 4
-
-    # If the growth rate doesn't change (i.e., change per year is 0), return 5 as the default cycle length
     if growth_rate_change_per_year == 0:
         return 5
-
-    # Estimate the number of years required for the growth rate to reach the end rate
     years = (growth5 - growth1) / growth_rate_change_per_year
-
     return int(years)
 
 def get_sales_to_capital_ratio(TICKER):
-
-    api_key = "435820a51119704ed53f7e7fb8a0cfec" # Example ticker
+    api_key = "435820a51119704ed53f7e7fb8a0cfec"
     test2 = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{TICKER}?period=quarter&apikey={api_key}"
     test4 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=quarter&apikey={api_key}"
     response2 = requests.get(test2)
     response4 = requests.get(test4)
     data2 = response2.json()
     data4 = response4.json()
-
-    # Extract sales (revenue) from the income statement
     sales = sum(item['revenue'] for item in data4[:4])
-
     invested_capital = data2[0].get('totalStockholdersEquity') + data2[0].get('totalDebt')
-
-    # Calculate sales-to-capital ratio
     sales_to_capital_ratio = sales / invested_capital
-    
-
     return sales_to_capital_ratio
 
 def estimate_terminal_ratio_from_comparables(target_ticker, comparable_tickers):
-    # List to store the sales-to-capital ratios for comparables
     ratios = []
-
-    # Iterate through each comparable ticker and compute its sales-to-capital ratio
     for ticker in comparable_tickers:
         try:
             ratio = get_sales_to_capital_ratio(ticker)
-            if not np.isnan(ratio):  # Filter out NaN values right away
+            if not np.isnan(ratio):
                 ratios.append(ratio)
         except Exception as e:
-            # Enhanced exception handling to print the specific error
             print(f"Could not fetch data for {ticker} due to {e}")
             continue
-
-    # Check if the ratios list is empty
     if not ratios:
         print("No valid data available for any of the tickers.")
         return np.nan
-
-    # Compute the median of the sales-to-capital ratios as the estimated terminal ratio
     terminal_ratio = np.median(ratios)
-
     return terminal_ratio
 
 def years_to_converge(current_ratio, terminal_ratio, threshold_percentage=0.05):
-    """
-    Calculate the number of years required for the current ratio to converge towards the terminal ratio.
-
-    :param current_ratio: Current sales to capital ratio.
-    :param terminal_ratio: Terminal sales to capital ratio.
-    :param threshold_percentage: Threshold percentage to consider as convergence.
-    :return: Number of years to begin convergence.
-    """
     years = 0
-
-    # Define a convergence limit
     convergence_limit = 1e-9
-
-    # While the difference between current_ratio and terminal_ratio is greater than the convergence_limit
     while abs(current_ratio - terminal_ratio) > convergence_limit:
-        # Increment the year
         years += 1
-
-        # Update current_ratio
         if current_ratio < terminal_ratio:
             current_ratio += threshold_percentage * (terminal_ratio - current_ratio)
         else:
             current_ratio -= threshold_percentage * (current_ratio - terminal_ratio)
-    if years > 10 :
-      years = 5
-
+    if years > 10:
+        years = 5
     return years
 
 def get_current_operating_margin(TICKER):
     try:
-        # Fetch the company data
-        api_key = "435820a51119704ed53f7e7fb8a0cfec" # Example ticker
+        api_key = "435820a51119704ed53f7e7fb8a0cfec"
         test4 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=quarter&apikey={api_key}"
         print(test4)
         response4 = requests.get(test4)
         data4 = response4.json()
-        
-        # Extract operating income and total revenue
         operating_income = data4[0].get('operatingIncome')
-        if operating_income == 0 :
+        if operating_income == 0:
             operating_income = data4[0].get('netIncome')
         total_revenue = data4[0].get('revenue')
-
-        # Calculate and return the operating margin
         return operating_income / total_revenue
-
     except Exception as e:
-        # Handle exceptions and print the error
-        print(f"Error fetching data for {ticker}: {e}")
+        print(f"Error fetching data for {TICKER}: {e}")
         return 0
 
 def estimate_terminal_operating_margin(comparable_tickers):
     margins = []
-
     for ticker in comparable_tickers:
         try:
             margin = get_current_operating_margin(ticker)
-            # Check and exclude NaN values and negative margins
             if margin is not None and not np.isnan(margin) and margin >= 0:
                 margins.append(margin)
         except Exception as e:
-            # Enhanced exception handling to print the specific error
             print(f"Couldn't fetch data for {ticker} due to {e}. Skipping...")
-
     if not margins:
         raise ValueError("Could not fetch data for any comparables or all fetched margins were negative")
-
-    # Return the average of the margins as the estimated terminal margin
     return sum(margins) / len(margins)
 
 def year_margin_begins_to_converge(current_operating_margin, terminal_operating_margin, threshold=0.05):
-    """
-    Calculate the year when the current operating margin begins to converge to the terminal operating margin.
-
-    Parameters:
-    - current_operating_margin: Current operating margin of the company.
-    - terminal_operating_margin: Estimated terminal operating margin based on industry comparables.
-    - threshold: Convergence threshold. The year when the difference between the current and terminal margin
-                 is less than this threshold will be returned.
-
-    Returns:
-    - Year when the current margin begins to converge to the terminal margin.
-    """
-
-    # Initialize year count
     year = 0
-
-    # Loop until convergence is achieved
     while abs(current_operating_margin - terminal_operating_margin) > threshold:
-        # Linearly converge the current margin to the terminal margin
         current_operating_margin = (current_operating_margin + terminal_operating_margin) / 2
         year += 1
-
-        # Safety mechanism to prevent infinite loops
         if year > 100:
             raise ValueError("Convergence taking too long. Check the values and threshold.")
-
-    if year == 0 :
-
-      return 1
-
-    if year > 10 :
-
-      return 5
-
+    if year == 0:
+        return 1
+    if year > 10:
+        return 5
     return year
-
 
 def calculate_upside_downside(intrinsic_value, current_cap):
     if current_cap <= 0:
         raise ValueError("Current market cap must be greater than 0.")
-
     difference = intrinsic_value - current_cap
     percentage = (difference / current_cap)
     return percentage
 
-import cmath
-
 def calculate_cagr(PV, FV, n):
     if PV == 0:
         raise ValueError("Initial value (PV) cannot be zero.")
-
     ratio = float(FV) / float(PV)
     cagr_complex = (ratio ** (1.0 / float(n))) - 1
     cagr = cagr_complex.real
-
-    # If FV is less than PV, return negative CAGR
     if FV < PV and cagr > 0:
         return -cagr
     return cagr
 
-# Define the URL for the API endpoint
-#TICKER = input("Please enter the ticker name: ")
-
-# Constants
-# New ENDPOINT for the JSON response
 ENDPOINT = "https://query2.finance.yahoo.com/v8/finance/chart/{}"
 TICKER_SP500 = "^GSPC"
 DURATION = 10
@@ -1597,32 +1417,20 @@ TODAY = int(datetime.now().timestamp())
 TEN_YEARS_AGO = int((datetime.now() - pd.DateOffset(years=DURATION)).timestamp())
 urlRFR = "https://query1.finance.yahoo.com/v7/finance/download/%5ETNX?period1=0&period2=9999999999&interval=1d&events=history&includeAdjustedClose=true"
 api_key = "435820a51119704ed53f7e7fb8a0cfec"
-
-# Headers to mimic browser request
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/91.0.4472.124 Safari/537.36'
 }
-
-# Get today's date
 today = datetime.today().strftime('%Y-%m-%d')
-
-# Get the date 1 year ago (you can adjust this duration)
 one_year_ago = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
-
-# Define the URL for the 10-year Treasury rate with dynamic dates
 urlRFR = f"https://financialmodelingprep.com/api/v4/treasury?from={one_year_ago}&to={today}&apikey={api_key}"
-
-# Make the request for the risk-free rate (RFR)
 responseRFR = requests.get(urlRFR, headers=headers)
-
-# Check if the request was successful
 if responseRFR.status_code == 200:
     data = responseRFR.json()
-
-    # Find the last available entry with a 'year10' rate
     if data:
-        last_valid_entry = data[-1]  # The most recent data is the last in the list
-        RFR = last_valid_entry.get('year10')  # Get the 10-year Treasury rate
+        last_valid_entry = data[-1]
+        RFR = last_valid_entry.get('year10')
         if RFR:
             print(f"The 10-year treasury yield in the USA is {RFR}%")
         else:
@@ -1632,23 +1440,15 @@ if responseRFR.status_code == 200:
 else:
     print(f"Error: The request failed with status code {responseRFR.status_code}. Response: {responseRFR.text}")
 
-# Fetch S&P 500 historical data
 urlSP500 = ENDPOINT.format(TICKER_SP500) + f"?period1={TEN_YEARS_AGO}&period2={TODAY}&interval=1d&events=history"
 responseSP500 = requests.get(urlSP500, headers=headers)
-
 if responseSP500.status_code != 200:
     raise Exception("Error fetching S&P 500 data.")
-
-# Get the JSON response
 dataSP500_response = responseSP500.json()
-
-# Check for the required structure in the response data
 if 'chart' in dataSP500_response and 'result' in dataSP500_response['chart'] and len(dataSP500_response['chart']['result']) > 0:
     result = dataSP500_response['chart']['result'][0]
     timestamps = result['timestamp']
     indicators = result['indicators']['quote'][0]
-
-    # Create a DataFrame with the parsed data
     dataSP500 = pd.DataFrame({
         'Date': pd.to_datetime(timestamps, unit='s'),
         'Open': indicators['open'],
@@ -1657,20 +1457,19 @@ if 'chart' in dataSP500_response and 'result' in dataSP500_response['chart'] and
         'Close': indicators['close'],
         'Volume': indicators['volume'],
     })
-
-    # Set 'Date' as the index and remove rows with NaN values
     dataSP500.set_index('Date', inplace=True)
-    dataSP500.dropna(inplace=True)  # Remove rows with missing data
-
-    print(dataSP500)  # Display the resulting DataFrame
-
+    dataSP500.dropna(inplace=True)
+    print(dataSP500)
 else:
     print("Error: No data found in the response.")
 
+# The following functions that are referenced below must already be defined:
+# valuator_multi_phase and point_estimate_describer are not defined here. 
+# Keep them as references and do not remove.
+
 def process_ticker(TICKER, excel_path):
-    global get_requests_count
-    global start_time
-    api_key = "435820a51119704ed53f7e7fb8a0cfec" # Example ticker
+    global dataSP500
+    api_key = "435820a51119704ed53f7e7fb8a0cfec"
     test = f"https://financialmodelingprep.com/api/v3/quote/{TICKER}?apikey={api_key}"
     test2 = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{TICKER}?period=annual&apikey={api_key}"
     test3 = f"https://financialmodelingprep.com/api/v3/profile/{TICKER}?apikey={api_key}"
@@ -1695,286 +1494,184 @@ def process_ticker(TICKER, excel_path):
     current_price = data[0].get('price')
     currency = data2[0].get('reportedCurrency')
     total_revenue = sum(item['revenue'] for item in data4[:4])
-
-    # Construct the URL
     urlCOMPANY = ENDPOINT.format(TICKER) + f"?period1={TEN_YEARS_AGO}&period2={TODAY}&interval=1d&events=history&includeAdjustedClose=true"
     print(urlCOMPANY)
-
-    # Make the API request
     responseCOMPANY = requests.get(urlCOMPANY, headers=headers)
     if responseCOMPANY.status_code != 200:
         raise Exception("Error fetching company data.")
-
-    # Parse JSON response
     data_json = responseCOMPANY.json()
-
-    # Check if the expected data structure is present
     if "chart" in data_json and "result" in data_json["chart"]:
         result = data_json["chart"]["result"][0]
-        
-        # Extract timestamps and prices
         timestamps = result["timestamp"]
         indicators = result.get("indicators", {})
         close_prices = indicators.get("quote", [{}])[0].get("close", [])
-
-        # Create a DataFrame with timestamps and close prices
         dataCOMPANY = pd.DataFrame({
             "Date": pd.to_datetime(timestamps, unit='s'),
             "Close": close_prices
         }).set_index("Date")
-
-        # Drop rows with missing data, if any
         dataCOMPANY.dropna(inplace=True)
-
-        # Now you can proceed to calculate the rolling beta with your dataCOMPANY DataFrame
         historical_beta = calculate_rolling_beta(dataCOMPANY, dataSP500, DURATION)
-
     else:
         raise Exception("Data structure does not match expected format.")
-
     initial_value = dataSP500['Close'].iloc[0]
     final_value = dataSP500['Close'].iloc[-1]
     Rm = ((final_value / initial_value) ** (1 / DURATION) - 1)
     risk_free_rate1 = RFR / 100
     ERP1 = Rm - risk_free_rate1
     print(f"Equity Risk Premium: {ERP1 * 100:.2f}%")
-
-    market_cap = convert_currency_yahoofin('USD' , currency, marketcap) / 10**9  # Convert to billions
+    market_cap = convert_currency_yahoofin('USD', currency, marketcap) / 10**9
     equity_value1 = market_cap
-
     print(f"The equity value (market cap) of {TICKER} is approximately ${market_cap:.2f} billion.")
-
-    # Use yfinance to get the debt values
     total_debt = data2[0].get('totalDebt')
-
     if pd.isna(total_debt) or total_debt == 0:
-      debt_value1 = 0
-
-    else :
-      debt_value1 = total_debt / 10**9
-
+        debt_value1 = 0
+    else:
+        debt_value1 = total_debt / 10**9
     print(f"The total debt of {TICKER} is approximately ${debt_value1:.2f} billion.")
-
-    # Use yfinance to get the cash and non-operating asset values
     cash_and_cash_equivalents = data2[0].get('cashAndCashEquivalents')
-
     Other_Non_Current_Assets = data2[0].get('otherNonCurrentAssets')
-
     intangibleAssets = data2[0].get('intangibleAssets')
-
     goodwill = data2[0].get('goodwill')
-    
     Investments_and_Advances = data2[0].get('longTermInvestments')
-    
     cash_and_non_operating_asset1 = np.nansum([
         cash_and_cash_equivalents,
         Other_Non_Current_Assets,
         Investments_and_Advances,
         goodwill,
         intangibleAssets
-        ]) / 10**9
-
-    
+    ]) / 10**9
     print(f"Cash and non-operating assets of {TICKER} is approximately ${cash_and_non_operating_asset1:.2f} billion.")
-
-
     df_result = get_stocks_from_same_industry(TICKER)
     comparable_tickers = df_result['symbol'].tolist()
-
-    # Get unlevered betas for each comparable
     unlevered_betas = [get_unlevered_beta(ticker) for ticker in comparable_tickers]
-    unlevered_betas = [beta for beta in unlevered_betas if beta is not None]  # Remove None values
-
-    # Calculate the industry average unlevered beta
+    unlevered_betas = [beta for beta in unlevered_betas if beta is not None]
     valid_betas = [beta for beta in unlevered_betas if not math.isnan(beta)]
     industry_average_unlevered_beta = sum(valid_betas) / len(valid_betas)
-    # Estimate the terminal_unlevered_beta
-    omega = 0.5  # Weight given to the company's current unlevered beta
+    omega = 0.5
     unlevered_beta1 = get_unlevered_beta(TICKER)
-    if unlevered_beta1 == None :
+    if unlevered_beta1 is None:
         unlevered_beta1 = industry_average_unlevered_beta
     terminal_unlevered_beta1 = omega * unlevered_beta1 + (1 - omega) * industry_average_unlevered_beta
-
     print(f"The estimated unlevered beta is: {unlevered_beta1}")
     print(f"The estimated terminal unlevered beta is: {terminal_unlevered_beta1}")
-
-    # Linear regression model
     X = np.array(range(len(historical_beta))).reshape(-1, 1)
     y = historical_beta.values
     model = LinearRegression().fit(X, y)
     slope = model.coef_[0]
     intercept = model.intercept_
-
-    # Calculate the intersection point with terminal beta using the equation of the line
-    # y = mx + c; terminal_beta = slope*x + intercept
     intersection_point = (terminal_unlevered_beta1 - intercept) / slope
-
-    # Convert intersection_point to years (assuming your historical data is daily)
     intersection_in_years = intersection_point
-
-    year_beta_begins_to_converge_to_terminal_beta1 = 1 #intersection_in_years
-
+    year_beta_begins_to_converge_to_terminal_beta1 = 1
     pretax_income = sum(item['incomeBeforeTax'] for item in data4[:4])
     pretax_income2 = data5[0].get('incomeBeforeTax')
     income_tax_expense = sum(item['incomeTaxExpense'] for item in data4[:4])
     income_tax_expense2 = data5[0].get('incomeTaxExpense')
-    tax_rate = 0.25 #income_tax_expense2 / pretax_income2
-
+    tax_rate = 0.25
     print(f"Current Effective Tax Rate: {tax_rate*100:.2f}%")
-
     current_effective_tax_rate1 = tax_rate
-
     current_pretax_cost_of_debt1 = get_pretax_cost_of_debt(TICKER)
-
     print(f"Current Pretax Cost of Debt: {current_pretax_cost_of_debt1*100:.2f}%")
-
-    # Get pre-tax cost of debt for each comparable
     pretax_costs_of_debt = [get_pretax_cost_of_debt(ticker) for ticker in comparable_tickers]
     pretax_costs_of_debt = [cost for cost in pretax_costs_of_debt if cost is not None]
-
-    # Filter out NaN and negative values
     valid_cost = [cost for cost in pretax_costs_of_debt if not math.isnan(cost) and cost >= 0]
-
     industry_average_pretax_cost_of_debt = sum(valid_cost) / len(valid_cost)
-
-
-    # Estimate the terminal_pre_tax_cost_of_debt
-    omega = 0.5  # Weight given to the company's current pre-tax cost of debt
+    omega = 0.5
     terminal_pretax_cost_of_debt1 = omega * current_pretax_cost_of_debt1 + (1 - omega) * industry_average_pretax_cost_of_debt
-
     print(f"The estimated terminal pre-tax cost of debt is: {terminal_pretax_cost_of_debt1*100:.2f}%")
-
-    year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1 = 1 #get_year_cost_of_debt_converges(TICKER, comparable_tickers)
-
+    year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1 = 1
     marginal_tax_rate1 = 0.25
-
     year_effective_tax_rate_begin_to_converge_marginal_tax_rate1 = 1
-
     revenue_base1 = total_revenue / 10**9
-
     print(f"The total revenue of {TICKER} is approximately ${revenue_base1:.2f} billion")
-
-    growth1, growth5 = fetch_growth_estimate(TICKER,revenue_base1,ERP1*100)
-
+    growth1, growth5 = fetch_growth_estimate(TICKER, revenue_base1, ERP1*100)
     revenue_growth_rate_cycle1_begin1 = growth1/100
-
     revenue_growth_rate_cycle1_end1 = growth5/100
-
-    length_of_cylcle1_1 = 1 #estimate_cycle_length(revenue_growth_rate_cycle1_begin1, revenue_growth_rate_cycle1_end1)
-
+    length_of_cylcle1_1 = 1
     revenue_growth_rate_cycle2_begin1 = (revenue_growth_rate_cycle1_begin1 + ERP1)/2
-
     revenue_growth_rate_cycle2_end1 = (revenue_growth_rate_cycle1_end1 + ERP1)/2
-
     length_of_cylcle2_1 = estimate_cycle_length(revenue_growth_rate_cycle2_begin1, revenue_growth_rate_cycle2_end1)
-
     revenue_growth_rate_cycle3_begin1 = (revenue_growth_rate_cycle2_begin1 + ERP1)/2
-
     revenue_growth_rate_cycle3_end1 = (revenue_growth_rate_cycle2_begin1 + ERP1 + risk_free_rate1)/3
-
-    length_of_cylcle3_1 = 1 #estimate_cycle_length(revenue_growth_rate_cycle3_begin1, revenue_growth_rate_cycle3_end1)
-
+    length_of_cylcle3_1 = 1
     revenue_convergance_periods_cycle1_1 = 1
     revenue_convergance_periods_cycle2_1 = 1
     revenue_convergance_periods_cycle3_1 = 1
-
     current_sales_to_capital_ratio1 = get_sales_to_capital_ratio(TICKER)
-
     print(f"the current sales to capital ratio is {current_sales_to_capital_ratio1}")
-
-    terminal_sales_to_capital_ratio1 = (estimate_terminal_ratio_from_comparables(TICKER,comparable_tickers) + get_sales_to_capital_ratio(TICKER))/2
-
+    terminal_sales_to_capital_ratio1 = (estimate_terminal_ratio_from_comparables(TICKER, comparable_tickers)
+                                        + get_sales_to_capital_ratio(TICKER)
+                                        + get_sales_to_capital_ratio(TICKER))/3
     print(f"the terminal sales to capital ratio is {terminal_sales_to_capital_ratio1}")
-
-    year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1 = 1 #years_to_converge(current_sales_to_capital_ratio1, terminal_sales_to_capital_ratio1 , 0.05)
-
+    year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1 = 1
     current_operating_margin1 = get_current_operating_margin(TICKER)
-
-    terminal_operating_margin1 = (estimate_terminal_operating_margin(comparable_tickers) + get_current_operating_margin(TICKER) + get_current_operating_margin(TICKER))/3
-
-    year_operating_margin_begins_to_converge_to_terminal_operating_margin1 = 1 #year_margin_begins_to_converge(current_operating_margin1, terminal_operating_margin1, 0.02)
-
+    terminal_operating_margin1 = (estimate_terminal_operating_margin(comparable_tickers)
+                                  + get_current_operating_margin(TICKER)
+                                  + get_current_operating_margin(TICKER))/3
+    year_operating_margin_begins_to_converge_to_terminal_operating_margin1 = 1
     additional_return_on_cost_of_capital_in_perpetuity1 = 0.02
-
     asset_liquidation_during_negative_growth1 = 0
-
     current_invested_capital = revenue_base1 / current_sales_to_capital_ratio1
 
+    # The following functions (valuator_multi_phase and point_estimate_describer) are not defined here
+    # They must be defined elsewhere. We are keeping them as is.
     base_case_valuation = valuator_multi_phase(
-                risk_free_rate = risk_free_rate1,
-                ERP = ERP1,
-                equity_value = equity_value1,
-                debt_value = debt_value1,
-                cash_and_non_operating_asset = cash_and_non_operating_asset1,
-                unlevered_beta = unlevered_beta1,
-                terminal_unlevered_beta = terminal_unlevered_beta1,
-                year_beta_begins_to_converge_to_terminal_beta = year_beta_begins_to_converge_to_terminal_beta1,
-                current_pretax_cost_of_debt = current_pretax_cost_of_debt1,
-                terminal_pretax_cost_of_debt = terminal_pretax_cost_of_debt1,
-                year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt = year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1,
-                current_effective_tax_rate = current_effective_tax_rate1,
-                marginal_tax_rate = marginal_tax_rate1,
-                year_effective_tax_rate_begin_to_converge_marginal_tax_rate = year_effective_tax_rate_begin_to_converge_marginal_tax_rate1,
-                 revenue_base = revenue_base1,
-                 revenue_growth_rate_cycle1_begin = revenue_growth_rate_cycle1_begin1,
-                 revenue_growth_rate_cycle1_end = revenue_growth_rate_cycle1_end1,
-                 length_of_cylcle1 = length_of_cylcle1_1,
-                 revenue_growth_rate_cycle2_begin = revenue_growth_rate_cycle2_begin1,
-                 revenue_growth_rate_cycle2_end = revenue_growth_rate_cycle2_end1,
-                 length_of_cylcle2 = length_of_cylcle2_1,
-                 revenue_growth_rate_cycle3_begin = revenue_growth_rate_cycle3_begin1,
-                 revenue_growth_rate_cycle3_end = revenue_growth_rate_cycle3_end1,
-                 length_of_cylcle3 = length_of_cylcle3_1,
-                revenue_convergance_periods_cycle1 = revenue_convergance_periods_cycle1_1,
-                revenue_convergance_periods_cycle2 = revenue_convergance_periods_cycle2_1,
-                revenue_convergance_periods_cycle3 = revenue_convergance_periods_cycle3_1,
-                current_sales_to_capital_ratio = current_sales_to_capital_ratio1,
-                terminal_sales_to_capital_ratio = terminal_sales_to_capital_ratio1,
-                year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital = year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1,
-                current_operating_margin = current_operating_margin1,
-                terminal_operating_margin = terminal_operating_margin1,
-                year_operating_margin_begins_to_converge_to_terminal_operating_margin = year_operating_margin_begins_to_converge_to_terminal_operating_margin1,
-                additional_return_on_cost_of_capital_in_perpetuity = additional_return_on_cost_of_capital_in_perpetuity1,
-                asset_liquidation_during_negative_growth = asset_liquidation_during_negative_growth1)
+        risk_free_rate=risk_free_rate1,
+        ERP=ERP1,
+        equity_value=equity_value1,
+        debt_value=debt_value1,
+        cash_and_non_operating_asset=cash_and_non_operating_asset1,
+        unlevered_beta=unlevered_beta1,
+        terminal_unlevered_beta=terminal_unlevered_beta1,
+        year_beta_begins_to_converge_to_terminal_beta=year_beta_begins_to_converge_to_terminal_beta1,
+        current_pretax_cost_of_debt=current_pretax_cost_of_debt1,
+        terminal_pretax_cost_of_debt=terminal_pretax_cost_of_debt1,
+        year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt=year_cost_of_debt_begins_to_converge_to_terminal_cost_of_debt1,
+        current_effective_tax_rate=current_effective_tax_rate1,
+        marginal_tax_rate=marginal_tax_rate1,
+        year_effective_tax_rate_begin_to_converge_marginal_tax_rate=year_effective_tax_rate_begin_to_converge_marginal_tax_rate1,
+        revenue_base=revenue_base1,
+        revenue_growth_rate_cycle1_begin=revenue_growth_rate_cycle1_begin1,
+        revenue_growth_rate_cycle1_end=revenue_growth_rate_cycle1_end1,
+        length_of_cylcle1=length_of_cylcle1_1,
+        revenue_growth_rate_cycle2_begin=revenue_growth_rate_cycle2_begin1,
+        revenue_growth_rate_cycle2_end=revenue_growth_rate_cycle2_end1,
+        length_of_cylcle2=length_of_cylcle2_1,
+        revenue_growth_rate_cycle3_begin=revenue_growth_rate_cycle3_begin1,
+        revenue_growth_rate_cycle3_end=revenue_growth_rate_cycle3_end1,
+        length_of_cylcle3=length_of_cylcle3_1,
+        revenue_convergance_periods_cycle1=revenue_convergance_periods_cycle1_1,
+        revenue_convergance_periods_cycle2=revenue_convergance_periods_cycle2_1,
+        revenue_convergance_periods_cycle3=revenue_convergance_periods_cycle3_1,
+        current_sales_to_capital_ratio=current_sales_to_capital_ratio1,
+        terminal_sales_to_capital_ratio=terminal_sales_to_capital_ratio1,
+        year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital=year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1,
+        current_operating_margin=current_operating_margin1,
+        terminal_operating_margin=terminal_operating_margin1,
+        year_operating_margin_begins_to_converge_to_terminal_operating_margin=year_operating_margin_begins_to_converge_to_terminal_operating_margin1,
+        additional_return_on_cost_of_capital_in_perpetuity=additional_return_on_cost_of_capital_in_perpetuity1,
+        asset_liquidation_during_negative_growth=asset_liquidation_during_negative_growth1
+    )
 
-    # Get your DataFrame
     df_valuation = point_estimate_describer(base_case_valuation)
-
-    intrinsic_equity_value = convert_currency_yahoofin(currency,'USD', base_case_valuation['equity_value'])
+    intrinsic_equity_value = convert_currency_yahoofin(currency, 'USD', base_case_valuation['equity_value'])
     cap2 = marketcap / 10**9
     print(cap2)
     cagr = calculate_upside_downside(intrinsic_equity_value, cap2)
     print(f"The UPSIDE/DOWNSIDE is {cagr:.2%}")
-    
     if os.path.exists(excel_path):
         results_df = pd.read_excel(excel_path)
     else:
         results_df = pd.DataFrame(columns=['Ticker', 'Upside/Downside'])
-
-    # Create a DataFrame for the new data
     new_row = pd.DataFrame({'Ticker': [TICKER], 'Upside/Downside': [cagr]})
-
-    # Append the new data using concat
     results_df = pd.concat([results_df, new_row], ignore_index=True)
-
-    # Save the updated DataFrame to Excel
     results_df.to_excel(excel_path, index=False)
-
-    # Save DataFrame to Excel
     excel_path = f"dcf_{TICKER}.xlsx"
     df_valuation.to_excel(excel_path)
-
     number_of_share = sharesOutstanding / 10**9
     print(sharesOutstanding)
-
     real_value = intrinsic_equity_value/number_of_share
-
     int_value = convert_currency_yahoofin(currency,'USD', real_value)
-
     print(f"$$Real value per share$$ : ${real_value}")
-
-    point_estimate_describer(base_case_valuation)
-    
 
 # Read the CSV file
 ticker_df = pd.read_csv('beta.csv')
