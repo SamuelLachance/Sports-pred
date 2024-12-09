@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import numpy as np
 import warnings
+import unicodedata
 warnings.filterwarnings("ignore")
 
 def safe_divide(x, y):
@@ -41,7 +42,7 @@ team_abbr_to_name = {
     'SEA': 'Seattle Kraken',
     'SJS': 'San Jose Sharks',
     'SJ': 'San Jose Sharks',
-    'STL': 'St. Louis Blues',
+    'STL': 'St Louis Blues',
     'TBL': 'Tampa Bay Lightning',
     'TB': 'Tampa Bay Lightning',
     'TOR': 'Toronto Maple Leafs',
@@ -55,6 +56,13 @@ team_abbr_to_name = {
     'WPG': 'Winnipeg Jets',
     'WIN': 'Winnipeg Jets'
 }
+
+def remove_accents(input_str):
+    # Normalize string and remove accents
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', input_str)
+        if unicodedata.category(c) != 'Mn'
+    )
 
 today = datetime.date.today().strftime('%Y-%m-%d')
 year = 20242025
@@ -113,29 +121,46 @@ def get_team_dfs(team_name, df_dict):
     if 'Canadiens' in team_name:
         team_name_fixed = 'Montreal Canadiens'
     elif 'Blues' in team_name:
-        team_name_fixed = 'St. Louis Blues'
+        team_name_fixed = 'St Louis Blues'
     else:
         team_name_fixed = team_name
     team_dfs = {key: df[df['Team'] == team_name_fixed] for key, df in df_dict.items()}
     return team_dfs
 
+# Main processing loop
 for game in games:
+    # Retrieve and map team names from abbreviations
     home_abbrev = game['homeTeam']['abbrev']
     away_abbrev = game['awayTeam']['abbrev']
+    
     home_team = team_abbr_to_name.get(home_abbrev, home_abbrev)
     away_team = team_abbr_to_name.get(away_abbrev, away_abbrev)
+
+    # Fetch team dataframes
     team_dfs_H = get_team_dfs(home_team, df_dict)
     team_dfs_A = get_team_dfs(away_team, df_dict)
+    
+    # Initialize odds
     home_odds = away_odds = None
+
+    # Search for odds
     for odds_game in data_odds:
-        if odds_game['home_team'] == home_team and odds_game['away_team'] == away_team:
+        # Normalize and compare team names
+        if (remove_accents(odds_game['home_team']) == remove_accents(home_team) and
+            remove_accents(odds_game['away_team']) == remove_accents(away_team)):
+            
             for outcome in odds_game['bookmakers'][0]['markets'][0]['outcomes']:
-                if outcome['name'] == home_team:
+                if remove_accents(outcome['name']) == remove_accents(home_team):
                     home_odds = outcome['price']
-                elif outcome['name'] == away_team:
+                elif remove_accents(outcome['name']) == remove_accents(away_team):
                     away_odds = outcome['price']
+            
+            # Break out once odds are found
             break
+    
+    # Skip the game if odds are missing
     if home_odds is None or away_odds is None:
+        print(f"Odds missing for {home_team} vs {away_team}. Skipping...")
         continue
     try:
         HDCF_A = team_dfs_A['df']['HDCF/60'].values
@@ -218,17 +243,17 @@ for game in games:
         score1_H = ((((HDCF_H + HDCA_A)/2)*(((HDSH_H+(100-HDSV_A))/2)/100)) + (((MDCF_H + MDCA_A)/2)*(((MDSH_H+(100-MDSV_A))/2)/100))) + ((((((HDCF_H2 + HDCA_A3)/2)*(((HDSH_H2+(100-HDSV_A3))/2)/100)) + (((MDCF_H2 + MDCA_A3)/2)*(((MDSH_H2+(100-MDSV_A3))/2)/100)))/60)*PP_total_H)
         score2_A = ((XGF_A + XGA_H)/2) + ((((XGF_A2 + XGA_H3)/2)/60)*PP_total_A)
         score2_H = ((XGF_H + XGA_A)/2) + ((((XGF_H2 + XGA_A3)/2)/60)*PP_total_H)
-        pred_A = score1_A
-        pred_H = score1_H
+        pred_A = score1_A * PDO_A
+        pred_H = score1_H * PDO_H
         pred_A2 = score2_A * PDO_A
         pred_H2 = score2_H * PDO_H
         pred_total = pred_A + pred_H
         pred_total2 = pred_A2 + pred_H2
-        imp_odds_A = (pred_A / pred_total)*100
-        imp_odds_B = (pred_H / pred_total)*100
+        imp_odds_A = (pred_A2 / pred_total2)*100
+        imp_odds_B = (pred_H2 / pred_total2)*100
         print(f"{away_team} vs {home_team}:")
-        print("Score_A :", pred_A, "Win%:", imp_odds_A)
-        print("Score_H :", pred_H, "Win%:", imp_odds_B)
+        print("Score_A :", pred_A2, "Win%:", imp_odds_A)
+        print("Score_H :", pred_H2, "Win%:", imp_odds_B)
         print("Total:", pred_total2)
     except Exception as e:
         continue
