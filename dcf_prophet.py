@@ -1587,11 +1587,11 @@ def process_ticker(TICKER, excel_path):
     revenue_growth_rate_cycle1_begin1 = growth1/100
     revenue_growth_rate_cycle1_end1 = growth5/100
     length_of_cylcle1_1 = 1
-    revenue_growth_rate_cycle2_begin1 = (revenue_growth_rate_cycle1_begin1 + ERP1)/2
-    revenue_growth_rate_cycle2_end1 = (revenue_growth_rate_cycle1_end1 + ERP1)/2
+    revenue_growth_rate_cycle2_begin1 = (revenue_growth_rate_cycle1_begin1 + ERP1 + revenue_growth_rate_cycle1_begin1)/3
+    revenue_growth_rate_cycle2_end1 = (revenue_growth_rate_cycle1_begin1 + ERP1 + revenue_growth_rate_cycle1_begin1 + ERP1)/4
     length_of_cylcle2_1 = estimate_cycle_length(revenue_growth_rate_cycle2_begin1, revenue_growth_rate_cycle2_end1)
-    revenue_growth_rate_cycle3_begin1 = (revenue_growth_rate_cycle2_begin1 + ERP1)/2
-    revenue_growth_rate_cycle3_end1 = (revenue_growth_rate_cycle2_begin1 + ERP1 + risk_free_rate1)/3
+    revenue_growth_rate_cycle3_begin1 = (revenue_growth_rate_cycle2_begin1 + ERP1 + ERP1)/3
+    revenue_growth_rate_cycle3_end1 = ERP1
     length_of_cylcle3_1 = 1
     revenue_convergance_periods_cycle1_1 = 1
     revenue_convergance_periods_cycle2_1 = 1
@@ -1604,9 +1604,7 @@ def process_ticker(TICKER, excel_path):
     print(f"the terminal sales to capital ratio is {terminal_sales_to_capital_ratio1}")
     year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1 = 1
     current_operating_margin1 = get_current_operating_margin(TICKER)
-    terminal_operating_margin1 = (estimate_terminal_operating_margin(comparable_tickers)
-                                  + get_current_operating_margin(TICKER)
-                                  + get_current_operating_margin(TICKER))/3
+    terminal_operating_margin1 = (estimate_terminal_operating_margin(comparable_tickers)*0.2) + (get_current_operating_margin(TICKER)*0.8)
     year_operating_margin_begins_to_converge_to_terminal_operating_margin1 = 1
     additional_return_on_cost_of_capital_in_perpetuity1 = 0.02
     asset_liquidation_during_negative_growth1 = 0
