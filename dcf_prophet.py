@@ -1200,7 +1200,6 @@ def get_stocks_from_same_industry(ticker_symbol):
         print(f"No predefined screener available for sector: {normalized_sector}")
         return None
     data = s.get_screeners(normalized_sector)
-    print(data)
     df = pd.DataFrame(data[normalized_sector]['quotes'])
     return df
 
@@ -1289,18 +1288,40 @@ def get_year_cost_of_debt_converges(ticker, comparable_tickers):
 
 def fetch_growth_estimate(ticker, current_revenue, replacement_value=0.05):
     api_key = "435820a51119704ed53f7e7fb8a0cfec"
-    test1 = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}?apikey={api_key}"
-    response1 = requests.get(test1)
-    data1 = response1.json()
+    api_url = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}?apikey={api_key}"
+    response = requests.get(api_url)
+    data = response.json()
+    
     current_date = datetime.now().strftime("%Y-%m-%d")
-    filtered_data = [entry for entry in data1 if entry['date'] > current_date]
+    # Filter for future dates
+    filtered_data = [entry for entry in data if entry['date'] > current_date]
+    if not filtered_data:
+        raise ValueError("No future analyst estimates available.")
+    
+    # Sort by date to get the closest future estimate (next year's estimate)
     filtered_data.sort(key=lambda x: x['date'])
     closest_entry = filtered_data[0]
-    estimated_revenue_avg = closest_entry['estimatedRevenueAvg'] / 10**9
-    growth1 = (estimated_revenue_avg - current_revenue) / current_revenue
-    growth1 = growth1 * 100
-    growth5 = (replacement_value + (growth1 * 2)) / 3
-    return growth1, growth5
+    estimated_revenue_next_year = closest_entry['estimatedRevenueAvg'] / 10**9
+    
+    # Calculate 1-year growth
+    growth1 = (estimated_revenue_next_year - current_revenue) / current_revenue * 100
+    
+    # Check if we have enough data for a 3-year growth calculation (need at least 4 entries)
+    if len(filtered_data) < 4:
+        # Not enough data for a proper 3-year CAGR.
+        # We'll use the 1-year growth and adjust it slightly (e.g., reduce by 10%).
+        growth3 = growth1 * 0.9
+        return growth1, growth3
+    
+    # If we do have enough data, proceed with 3-year calculation
+    three_year_entry = filtered_data[3]
+    estimated_revenue_3year = three_year_entry['estimatedRevenueAvg'] / 10**9
+    
+    # 3-year CAGR calculation
+    growth3 = ((estimated_revenue_3year / current_revenue)**(1/3) - 1) * 100
+    
+    return growth1, growth3
+
 
 def estimate_cycle_length(growth1, growth5):
     growth_rate_change_per_year = (growth5 - growth1) / 4
@@ -1309,17 +1330,46 @@ def estimate_cycle_length(growth1, growth5):
     years = (growth5 - growth1) / growth_rate_change_per_year
     return int(years)
 
-def get_sales_to_capital_ratio(TICKER):
+def get_sales_to_capital_ratio(ticker):
+    """
+    Updated to use analyst projections for revenue.
+    Since the analyst estimates do not provide capital structure data,
+    we'll use the latest available actual data for totalStockholdersEquity and totalDebt.
+    """
     api_key = "435820a51119704ed53f7e7fb8a0cfec"
-    test2 = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{TICKER}?period=quarter&apikey={api_key}"
-    test4 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=quarter&apikey={api_key}"
-    response2 = requests.get(test2)
-    response4 = requests.get(test4)
-    data2 = response2.json()
-    data4 = response4.json()
-    sales = sum(item['revenue'] for item in data4[:4])
-    invested_capital = data2[0].get('totalStockholdersEquity') + data2[0].get('totalDebt')
-    sales_to_capital_ratio = sales / invested_capital
+    
+    # Fetch analyst estimates for revenue
+    estimates_url = f"https://financialmodelingprep.com/api/v3/analyst-estimates/{ticker}?apikey={api_key}"
+    response_estimates = requests.get(estimates_url)
+    estimates_data = response_estimates.json()
+    
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    future_estimates = [entry for entry in estimates_data if entry['date'] > current_date]
+    if not future_estimates:
+        raise ValueError("No future revenue estimates available.")
+    
+    # Get the closest future estimate
+    future_estimates.sort(key=lambda x: x['date'])
+    closest_estimate = future_estimates[0]
+    estimated_revenue = closest_estimate['estimatedRevenueAvg']
+    
+    # Fetch actual balance sheet data for capital
+    balance_sheet_url = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{ticker}?period=quarter&apikey={api_key}"
+    response_balance = requests.get(balance_sheet_url)
+    balance_data = response_balance.json()
+    
+    if not balance_data:
+        raise ValueError("No balance sheet data available.")
+    
+    latest_balance = balance_data[0]
+    total_stockholders_equity = latest_balance.get('totalStockholdersEquity', 0)
+    total_debt = latest_balance.get('totalDebt', 0)
+    
+    invested_capital = total_stockholders_equity + total_debt
+    if invested_capital == 0:
+        raise ValueError("Invested capital is zero, cannot compute sales to capital ratio.")
+    
+    sales_to_capital_ratio = estimated_revenue / invested_capital
     return sales_to_capital_ratio
 
 def estimate_terminal_ratio_from_comparables(target_ticker, comparable_tickers):
@@ -1347,8 +1397,9 @@ def years_to_converge(current_ratio, terminal_ratio, threshold_percentage=0.05):
             current_ratio += threshold_percentage * (terminal_ratio - current_ratio)
         else:
             current_ratio -= threshold_percentage * (current_ratio - terminal_ratio)
-    if years > 10:
-        years = 5
+        if years > 10:  # Prevent infinite loop
+            years = 5
+            break
     return years
 
 def get_current_operating_margin(TICKER):
@@ -1474,7 +1525,6 @@ def process_ticker(TICKER, excel_path):
     test2 = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{TICKER}?period=annual&apikey={api_key}"
     test3 = f"https://financialmodelingprep.com/api/v3/profile/{TICKER}?apikey={api_key}"
     test4 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=quarter&apikey={api_key}"
-    print(test4)
     test5 = f"https://financialmodelingprep.com/api/v3/income-statement/{TICKER}?period=annual&apikey={api_key}"
     response = requests.get(test)
     response2 = requests.get(test2)
@@ -1482,12 +1532,9 @@ def process_ticker(TICKER, excel_path):
     response4 = requests.get(test4)
     response5 = requests.get(test5)
     data = response.json()
-    print(data)
     data2 = response2.json()
-    print(data2)
     data3 = response3.json()
     data4 = response4.json()
-    print(data4)
     data5 = response5.json()
     marketcap = data[0].get('marketCap')
     sharesOutstanding = data[0].get('sharesOutstanding')
@@ -1585,10 +1632,10 @@ def process_ticker(TICKER, excel_path):
     print(f"The total revenue of {TICKER} is approximately ${revenue_base1:.2f} billion")
     growth1, growth5 = fetch_growth_estimate(TICKER, revenue_base1, ERP1*100)
     revenue_growth_rate_cycle1_begin1 = growth1/100
-    revenue_growth_rate_cycle1_end1 = growth5/100
+    revenue_growth_rate_cycle1_end1 = (growth1/100 + ERP1)/2
     length_of_cylcle1_1 = 1
     revenue_growth_rate_cycle2_begin1 = (revenue_growth_rate_cycle1_end1 + ERP1)/2
-    revenue_growth_rate_cycle2_end1 = (revenue_growth_rate_cycle2_begin1 + ERP1)/2
+    revenue_growth_rate_cycle2_end1 =  (growth5/100 + ERP1)/2
     length_of_cylcle2_1 = 3#estimate_cycle_length(revenue_growth_rate_cycle2_begin1, revenue_growth_rate_cycle2_end1)
     revenue_growth_rate_cycle3_begin1 = (revenue_growth_rate_cycle2_end1 + ERP1)/2
     revenue_growth_rate_cycle3_end1 = (revenue_growth_rate_cycle3_begin1 + ERP1)/2
@@ -1598,11 +1645,11 @@ def process_ticker(TICKER, excel_path):
     revenue_convergance_periods_cycle3_1 = 1
     current_sales_to_capital_ratio1 = get_sales_to_capital_ratio(TICKER)
     print(f"the current sales to capital ratio is {current_sales_to_capital_ratio1}")
-    terminal_sales_to_capital_ratio1 = (estimate_terminal_ratio_from_comparables(TICKER, comparable_tickers)*0.2) + (get_sales_to_capital_ratio(TICKER)*0.8)
+    terminal_sales_to_capital_ratio1 = (estimate_terminal_ratio_from_comparables(TICKER, comparable_tickers)*0.3) + (get_sales_to_capital_ratio(TICKER)*0.7)
     print(f"the terminal sales to capital ratio is {terminal_sales_to_capital_ratio1}")
     year_sales_to_capital_begins_to_converge_to_terminal_sales_to_capital1 = 1
     current_operating_margin1 = get_current_operating_margin(TICKER)
-    terminal_operating_margin1 = (estimate_terminal_operating_margin(comparable_tickers)*0.2) + (get_current_operating_margin(TICKER)*0.8)
+    terminal_operating_margin1 = (estimate_terminal_operating_margin(comparable_tickers)*0.3) + (get_current_operating_margin(TICKER)*0.7)
     year_operating_margin_begins_to_converge_to_terminal_operating_margin1 = 1
     additional_return_on_cost_of_capital_in_perpetuity1 = 0.02
     asset_liquidation_during_negative_growth1 = 0
