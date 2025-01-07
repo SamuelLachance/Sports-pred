@@ -15,6 +15,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 from pandas import json_normalize
 import warnings
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 warnings.filterwarnings("ignore")
 
 class Team:
@@ -664,8 +666,6 @@ def merge_odds_and_projections(odds_df, projections_df):
     merged_df[['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']] = merged_df[
         ['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']].round(1)
 
-    merged_df.drop(columns=['Home MoneyLine', 'Away MoneyLine'], inplace=True)
-
     # Google Sheets Integration
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
@@ -677,6 +677,8 @@ def merge_odds_and_projections(odds_df, projections_df):
     sheet_name = 'BoomerModel'
     sheet = spreadsheet.worksheet(sheet_name)
 
+    sheet.clear()
+
     # Append headers if the first row is empty
     if not sheet.row_values(1):
         sheet.append_row(merged_df.columns.tolist())
@@ -686,7 +688,359 @@ def merge_odds_and_projections(odds_df, projections_df):
 
     return merged_df
 
+def get_game_projections(date):
+    url = "https://ozajxwcjhgjugnhluqcm.supabase.co/rest/v1/game_projections"
+    headers = {
+        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96YWp4d2NqaGdqdWduaGx1cWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTg2NzIxNDAsImV4cCI6MjAzNDI0ODE0MH0.V4rXuEbCloTCWeIAa-eCHcq9lvPi2mDhOMAaUL5oxGY",
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96YWp4d2NqaGdqdWduaGx1cWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTg2NzIxNDAsImV4cCI6MjAzNDI0ODE0MH0.V4rXuEbCloTCWeIAa-eCHcq9lvPi2mDhOMAaUL5oxGY",
+        "Accept-Profile": "public",
+    }
+    params = {
+        "select": "*",
+        "date": f"eq.{date}",
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        df = pd.DataFrame(data)
+        df.to_csv(f"game_projections_{date}.csv", index=False)
+        return df
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        return None
+
+def match_team_names(source_name, target_names):
+    """
+    Match a team name from the source to the closest team name in the target list.
+
+    Args:
+        source_name (str): The team name to match.
+        target_names (list): A list of team names to match against.
+
+    Returns:
+        str: The closest matching team name or None if no good match is found.
+    """
+    match, score = process.extractOne(source_name.lower(), [name.lower() for name in target_names], scorer=fuzz.ratio)
+    if score >= 80:  # Threshold for matching quality
+        return next(name for name in target_names if name.lower() == match)
+    return None
+
+
+def merge_odds_and_projections2(odds_df, projections_df):
+    decimal_places = 3
+
+    # Read and preprocess moneypuck.csv
+    final_df = pd.read_csv('moneypuck.csv')
+    final_df_2 = pd.read_csv('final_df_nhl.csv')
+
+    # Remove '%' and convert percentages to decimals in final_df
+    for col in ['away_team_percentage', 'home_team_percentage']:
+        if col in final_df.columns:
+            final_df[col] = final_df[col].str.replace('%', '').astype(float) / 100
+
+    # Convert percentages to decimals in final_df_2 if needed
+    if final_df_2['home_team_percentage'].max() > 1:
+        final_df_2['home_team_percentage'] = final_df_2['home_team_percentage'] / 100
+        final_df_2['away_team_percentage'] = final_df_2['away_team_percentage'] / 100
+
+    # Perform fuzzy matching for Home and Away names in odds_df against projections_df
+    projections_home_names = projections_df['home_name'].unique()
+    projections_away_names = projections_df['visitor_name'].unique()
+    odds_df['Matched Home Name'] = odds_df['Home Name'].apply(
+        lambda x: match_team_names(x, projections_home_names)
+    )
+    odds_df['Matched Away Name'] = odds_df['Away Name'].apply(
+        lambda x: match_team_names(x, projections_away_names)
+    )
+
+    # Merge odds_df and projections_df using matched names
+    merged_df = pd.merge(
+        odds_df,
+        projections_df,
+        left_on=['Matched Home Name', 'Matched Away Name', 'Date'],
+        right_on=['home_name', 'visitor_name', 'date'],
+        how='inner'
+    )
+
+    # Perform fuzzy matching for merged_df Home and Away names against final_df
+    final_home_names = final_df['home_team'].unique()
+    final_away_names = final_df['away_team'].unique()
+    merged_df['Matched Final Home Name'] = merged_df['Home Name'].apply(
+        lambda x: match_team_names(x, final_home_names)
+    )
+    merged_df['Matched Final Away Name'] = merged_df['Away Name'].apply(
+        lambda x: match_team_names(x, final_away_names)
+    )
+
+    # Merge with final_df using matched names
+    merged_df = merged_df.merge(
+        final_df[['home_team', 'away_team', 'home_team_percentage', 'away_team_percentage']],
+        left_on=['Matched Final Home Name', 'Matched Final Away Name'],
+        right_on=['home_team', 'away_team'],
+        how='inner'
+    )
+
+    # Perform fuzzy matching for merged_df Home and Away names against final_df_2
+    final2_home_names = final_df_2['home_team'].unique()
+    final2_away_names = final_df_2['away_team'].unique()
+    merged_df['Matched Final2 Home Name'] = merged_df['Home Name'].apply(
+        lambda x: match_team_names(x, final2_home_names)
+    )
+    merged_df['Matched Final2 Away Name'] = merged_df['Away Name'].apply(
+        lambda x: match_team_names(x, final2_away_names)
+    )
+
+    # Merge with final_df_2 using matched names
+    merged_df = merged_df.merge(
+        final_df_2[['home_team', 'away_team', 'home_team_elo', 'away_team_elo']],
+        left_on=['Matched Final2 Home Name', 'Matched Final2 Away Name'],
+        right_on=['home_team', 'away_team'],
+        how='inner'
+    )
+
+    # Convert columns to numeric where required
+    for col in ['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']:
+        merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')  # Coerce invalid values to NaN
+
+    # Fill NaN probabilities with default values (optional)
+    merged_df.fillna({'Pre-Game Home Win Probability': 0, 'Pre-Game Away Win Probability': 0}, inplace=True)
+
+    # Convert 'Pre-Game' probabilities from percentages to decimals
+    merged_df['Pre-Game Home Win Probability'] /= 100
+    merged_df['Pre-Game Away Win Probability'] /= 100
+
+    # Calculate ELO-based probabilities
+    def elo_probability(home_elo, away_elo):
+        expected_home_win_prob = 1 / (1 + 10 ** ((away_elo - home_elo) / 400))
+        expected_away_win_prob = 1 - expected_home_win_prob
+        return expected_home_win_prob, expected_away_win_prob
+
+    merged_df['elo_home_prob'], merged_df['elo_away_prob'] = zip(*merged_df.apply(
+        lambda x: elo_probability(x['home_team_elo'], x['away_team_elo']), axis=1
+    ))
+
+    # Round the projections probabilities
+    merged_df['visitor_prob'] = merged_df['visitor_prob'].round(decimal_places)
+    merged_df['home_prob'] = merged_df['home_prob'].round(decimal_places)
+
+    # Calculate average probabilities including the ELO probabilities
+    merged_df['avg_home_prob'] = (
+        merged_df['home_team_percentage'] +
+        merged_df['Pre-Game Home Win Probability']
+    ) / 2
+
+    merged_df['avg_visitor_prob'] = (
+        merged_df['away_team_percentage'] +
+        merged_df['Pre-Game Away Win Probability']
+    ) / 2
+
+    # Calculate Expected Value (EV) for Away Team using average probability
+    merged_df['Away EV'] = merged_df.apply(
+        lambda x: calculate_ev(x['avg_visitor_prob'], x['Away MoneyLine']), axis=1
+    )
+
+    # Calculate Expected Value (EV) for Home Team using average probability
+    merged_df['Home EV'] = merged_df.apply(
+        lambda x: calculate_ev(x['avg_home_prob'], x['Home MoneyLine']), axis=1
+    )
+
+    # Convert probabilities to percentages for display
+    prob_columns = ['visitor_prob', 'home_prob', 'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability',
+                    'home_team_percentage', 'away_team_percentage', 'elo_home_prob', 'elo_away_prob',
+                    'avg_home_prob', 'avg_visitor_prob']
+    for col in prob_columns:
+        merged_df[col] = (merged_df[col] * 100).round(1)
+
+    # Convert EVs to percentages
+    merged_df['Home EV'] = (merged_df['Home EV'] * 100).round(1)
+    merged_df['Away EV'] = (merged_df['Away EV'] * 100).round(1)
+
+    # Specify the columns you want to keep
+    columns_to_keep = [
+        'Date',
+        'Home Name',
+        'Away Name',
+        'avg_home_prob',
+        'avg_visitor_prob',
+        'Home EV',
+        'Away EV'
+    ]
+
+    # Keep only the specified columns
+    merged_df = merged_df[columns_to_keep]
+    print(merged_df)
+
+    # Use credentials to create a client to interact with the Google Drive API
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+    client = gspread.authorize(creds)
+
+    # Open the spreadsheet by its key
+    spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+    spreadsheet = client.open_by_key(spreadsheet_id)
+
+    sheet_name = 'Average'
+
+    # Select the worksheet
+    sheet = spreadsheet.worksheet(sheet_name)
+
+    # Clear existing data
+    sheet.clear()
+
+    # Append headers
+    sheet.append_row(merged_df.columns.tolist())
+
+    # Convert DataFrame to a list of lists for the data rows
+    data = merged_df.values.tolist()
+
+    # Append the data rows to the sheet
+    sheet.append_rows(data)
+
+    return merged_df
+
+##def merge_odds_and_projections2(odds_df, projections_df):
+##    decimal_places = 3
+##
+##    # Read and preprocess moneypuck.csv
+##    final_df = pd.read_csv('moneypuck.csv')
+##
+##    # Remove '%' and convert percentages to decimals
+##    for col in ['away_team_percentage', 'home_team_percentage']:
+##        if col in final_df.columns:
+##            final_df[col] = final_df[col].str.replace('%', '').astype(float) / 100
+##
+##    # Perform fuzzy matching for Home and Away names in odds_df against projections_df
+##    projections_home_names = projections_df['home_name'].unique()
+##    projections_away_names = projections_df['visitor_name'].unique()
+##    odds_df['Matched Home Name'] = odds_df['Home Name'].apply(
+##        lambda x: match_team_names(x, projections_home_names)
+##    )
+##    odds_df['Matched Away Name'] = odds_df['Away Name'].apply(
+##        lambda x: match_team_names(x, projections_away_names)
+##    )
+##
+##    # Merge odds_df and projections_df using matched names
+##    merged_df = pd.merge(
+##        odds_df,
+##        projections_df,
+##        left_on=['Matched Home Name', 'Matched Away Name', 'Date'],
+##        right_on=['home_name', 'visitor_name', 'date'],
+##        how='inner'
+##    )
+##
+##    # Perform fuzzy matching for merged_df Home and Away names against final_df
+##    final_home_names = final_df['home_team'].unique()
+##    final_away_names = final_df['away_team'].unique()
+##    merged_df['Matched Final Home Name'] = merged_df['Home Name'].apply(
+##        lambda x: match_team_names(x, final_home_names)
+##    )
+##    merged_df['Matched Final Away Name'] = merged_df['Away Name'].apply(
+##        lambda x: match_team_names(x, final_away_names)
+##    )
+##
+##    # Merge with final_df using matched names
+##    merged_df = merged_df.merge(
+##        final_df[['home_team', 'away_team', 'home_team_percentage', 'away_team_percentage']],
+##        left_on=['Matched Final Home Name', 'Matched Final Away Name'],
+##        right_on=['home_team', 'away_team'],
+##        how='inner'
+##    )
+##
+##    # Convert columns to numeric where required
+##    for col in ['Pre-Game Home Win Probability', 'Pre-Game Away Win Probability']:
+##        merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')  # Coerce invalid values to NaN
+##
+##    # Fill NaN probabilities with default values (optional)
+##    merged_df.fillna({'Pre-Game Home Win Probability': 0, 'Pre-Game Away Win Probability': 0}, inplace=True)
+##
+##    # Convert 'Pre-Game' probabilities from percentages to decimals
+##    merged_df['Pre-Game Home Win Probability'] /= 100
+##    merged_df['Pre-Game Away Win Probability'] /= 100
+##
+##    # Round the projections probabilities
+##    merged_df['visitor_prob'] = merged_df['visitor_prob'].round(decimal_places)
+##    merged_df['home_prob'] = merged_df['home_prob'].round(decimal_places)
+##
+##    # Calculate average probabilities including the team percentages
+##    merged_df['avg_home_prob'] = (
+##        merged_df['home_prob'] +  
+##        merged_df['home_team_percentage']
+##    ) / 2
+##
+##    merged_df['avg_visitor_prob'] = (
+##        merged_df['visitor_prob'] +
+##        merged_df['away_team_percentage']
+##    ) / 2
+##
+##    # Calculate Expected Value (EV) for Away Team using average probability
+##    merged_df['Away EV'] = merged_df.apply(
+##        lambda x: calculate_ev(x['avg_visitor_prob'], x['Away MoneyLine']), axis=1
+##    )
+##
+##    # Calculate Expected Value (EV) for Home Team using average probability
+##    merged_df['Home EV'] = merged_df.apply(
+##        lambda x: calculate_ev(x['avg_home_prob'], x['Home MoneyLine']), axis=1
+##    )
+##
+##    # Convert probabilities to percentages for display
+##    prob_columns = ['visitor_prob', 'home_prob', 'Pre-Game Home Win Probability', 'Pre-Game Away Win Probability',
+##                    'home_team_percentage', 'away_team_percentage', 'avg_home_prob', 'avg_visitor_prob']
+##    for col in prob_columns:
+##        merged_df[col] = (merged_df[col] * 100).round(1)
+##
+##    # Convert EVs to percentages
+##    merged_df['Home EV'] = (merged_df['Home EV'] * 100).round(1)
+##    merged_df['Away EV'] = (merged_df['Away EV'] * 100).round(1)
+##
+##    # Specify the columns you want to keep
+##    columns_to_keep = [
+##        'Date',
+##        'Home Name',
+##        'Away Name',
+##        'avg_home_prob',
+##        'avg_visitor_prob',
+##        'Home EV',
+##        'Away EV'
+##    ]
+##
+##    # Keep only the specified columns
+##    merged_df = merged_df[columns_to_keep]
+##    print(merged_df)
+##
+##    # Use credentials to create a client to interact with the Google Drive API
+##    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+##    creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+##    client = gspread.authorize(creds)
+##
+##    # Open the spreadsheet by its key
+##    spreadsheet_id = '1KgwFdqrRUs2fa5pSRmirj6ajyO2d14ONLsiksAYk8S8'
+##    spreadsheet = client.open_by_key(spreadsheet_id)
+##
+##    sheet_name = 'Average'
+##
+##    # Select the worksheet
+##    sheet = spreadsheet.worksheet(sheet_name)
+##
+##    # Clear existing data
+##    sheet.clear()
+##
+##    # Append headers
+##    sheet.append_row(merged_df.columns.tolist())
+##
+##    # Convert DataFrame to a list of lists for the data rows
+##    data = merged_df.values.tolist()
+##
+##    # Append the data rows to the sheet
+##    sheet.append_rows(data)
+##
+##    return merged_df
+
 def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, total_game_list, team_list, date):
+    game_projections_df = get_game_projections(date)
+    print(game_projections_df)
     while True:
         print("""--MAIN MENU--
     1. View Power Rankings
@@ -707,6 +1061,7 @@ def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, to
                 odds_df = fetch_odds_data(date)
                 if odds_df is not None:
                     merged_df = merge_odds_and_projections(odds_df, today_games_df)
+                    merged_df = merge_odds_and_projections2(merged_df,game_projections_df)
                     print(merged_df)
                 else:
                     print("No odds data available.")
@@ -734,7 +1089,6 @@ def menu(power_df, today_games_df, xpoints, ypoints, param, computation_time, to
 
 def main():
     start_time = time.time()
-
     games_metadf, team_id_dict = scrape_nhl_data()
     iterations = 10
     team_list, total_game_list = game_team_object_creation(games_metadf)
