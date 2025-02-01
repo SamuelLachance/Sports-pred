@@ -23,7 +23,7 @@ service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 
 # URL for NCAA results in English
-url = 'https://www.flashscore.ca/football/usa/nfl/results/'
+url = 'https://www.flashscore.com/basketball/usa/ncaa/results/'
 driver.get(url)
 
 # Close the cookie banner if it appears
@@ -40,7 +40,7 @@ except NoSuchElementException:
 while True:
     try:
         load_more_button = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Show more games')]"))
+            EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Show more matches')]"))
         )
         load_more_button.click()
         time.sleep(2)  # Wait after clicking

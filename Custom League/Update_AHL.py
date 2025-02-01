@@ -8,6 +8,8 @@ from selenium.common.exceptions import NoSuchElementException, ElementClickInter
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import csv
+import requests
+import json
 
 # Browser options
 options = Options()
@@ -100,3 +102,4 @@ print(f"Match data saved to {csv_file_path}")
 
 # Close the browser
 driver.quit()
+

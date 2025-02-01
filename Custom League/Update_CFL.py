@@ -23,7 +23,7 @@ service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 
 # URL for NCAA results in English
-url = 'https://www.flashscore.ca/football/canada/cfl/results/'
+url = 'https://www.flashscore.co.uk/american-football/canada/cfl/results/'
 driver.get(url)
 
 # Close the cookie banner if it appears
