@@ -1,102 +1,124 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
-import time
+import datetime
+from bs4 import BeautifulSoup
+import utils
+import requests
 import csv
 
-# Browser options
-options = Options()
-options.add_argument("--headless")  # Run in headless mode
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--disable-gpu")
-options.add_argument("--disable-software-rasterizer")
-options.add_argument("--window-size=1920,1080")
+URLV2 = 'https://www.scoresandodds.com/ncaab?date=YEAR-MONTH-DAY'
+DATA_FOLDER = utils.DATA_FOLDER
+SR_NAMES_MAP = utils.read_two_column_csv_to_dict('Data/so_sr_mapping.csv')
 
-# Set up ChromeDriver
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+def scrape_neutral_data():
+    """Scrape neutral site information from TeamRankings"""
+    schedule_url = 'https://www.teamrankings.com/ncb/schedules/season/'
+    data = requests.get(schedule_url).content
+    table_games_data = BeautifulSoup(data, 'html.parser').find_all("tr")
+    all_rows = [i.text.split('\n') for i in table_games_data]
 
-# URL for NCAA results in English
-url = 'https://www.flashscore.com.ng/basketball/usa/ncaa-2023-2024/results/'
-driver.get(url)
+    neutral_map = {}
+    this_date = utils.format_tr_dates(all_rows[0][1])
+    for r in all_rows[1:]:
+        val = r[1]
+        if '@' in val:
+            teams = val.split('  @  ')
+            neutral_map[(teams[0], teams[1], this_date)] = 0
+        elif 'vs.' in val:
+            teams = val.split('  vs.  ')
+            neutral_map[(teams[0], teams[1], this_date)] = 1
+        else:
+            this_date = utils.format_tr_dates(val)
+    return neutral_map
 
-# Close the cookie banner if it appears
-try:
-    cookie_banner = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, "#onetrust-accept-btn-handler"))
-    )
-    cookie_banner.click()
-    print("Cookie banner closed.")
-except NoSuchElementException:
-    print("Cookie banner not found, continuing.")
+def get_clean_team_name(team_element):
+    """Extract and clean team name from HTML element"""
+    team = team_element.find('span', {'class': 'team-name'})
+    if team.find('a') is None:
+        return team.find('span').text.strip(' 1234567890()')
+    return team.find('a').text.strip(' 1234567890()')
 
-# Click the "Show more games" button until it's unavailable
-while True:
-    try:
-        load_more_button = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Show more matches')]"))
+def scrape_scores(date_obj):
+    """Scrape game data for a specific date and format as dictionaries"""
+    day, month, year = str(date_obj.day), str(date_obj.month), str(date_obj.year)
+    url = URLV2.replace("DAY", day).replace("MONTH", month).replace("YEAR", year)
+    response = requests.get(url)
+    
+    if response.status_code != 200:
+        print(f'ERROR: Response Code {response.status_code}')
+        return []
+
+    data = response.content
+    soup = BeautifulSoup(data, 'html.parser')
+    games = []
+
+    for game in soup.find_all('tbody'):
+        rows = game.find_all('tr')
+        if len(rows) < 2:
+            continue
+
+        away_row, home_row = rows[0], rows[1]
+        
+        # Process away team
+        away = SR_NAMES_MAP.get(
+            get_clean_team_name(away_row), 
+            get_clean_team_name(away_row)
         )
-        load_more_button.click()
-        time.sleep(2)  # Wait after clicking
-    except (NoSuchElementException, TimeoutException):
-        print("All matches loaded or button is unavailable.")
-        break
-    except ElementClickInterceptedException:
-        print("Element not clickable, retrying.")
-        time.sleep(2)
+        away_score = away_row.find('td', {'class': 'event-card-score'})
+        away_score = away_score.text.strip() if away_score else 'N/A'
 
-# Parse match data
-matches = driver.find_elements(By.CSS_SELECTOR, "div.event__match")
+        # Process home team
+        home = SR_NAMES_MAP.get(
+            get_clean_team_name(home_row), 
+            get_clean_team_name(home_row)
+        )
+        home_score = home_row.find('td', {'class': 'event-card-score'})
+        home_score = home_score.text.strip() if home_score else 'N/A'
 
-# Collect match data
-match_data = []
+        # Skip incomplete entries
+        if 'N/A' in [away_score, home_score]:
+            continue
 
-for match in matches:
-    # Match time
-    match_time = match.find_element(By.CSS_SELECTOR, "div.event__time").text.strip()
+        games.append({
+            'Home Team': home,
+            'Home Score': home_score,
+            'Visitor Score': away_score,
+            'Visiting Team': away
+        })
 
-    # Team names
-    home_team = match.find_element(By.CSS_SELECTOR, "div.event__participant--home").text.strip()
-    away_team = match.find_element(By.CSS_SELECTOR, "div.event__participant--away").text.strip()
+    return games
 
-    # Scores
-    scores = match.find_elements(By.CSS_SELECTOR, "div.event__score")
-    if len(scores) >= 2:
-        home_score = scores[0].text.strip()
-        away_score = scores[1].text.strip()
-    else:
-        home_score = "N/A"
-        away_score = "N/A"
+def scrape_season(start_date, end_date):
+    """Scrape an entire season's worth of data"""
+    current_date = start_date
+    all_games = []
 
-    # Clean team names by removing "@" if present
-    home_team_cleaned = home_team.replace('@', '').strip()
-    away_team_cleaned = away_team.replace('@', '').strip()
+    while current_date <= end_date:
+        if current_date.month in [5, 6, 7, 8, 9, 10]:
+            current_date += datetime.timedelta(days=1)
+            continue
+            
+        print(f"Scraping {current_date.strftime('%Y-%m-%d')}")
+        daily_games = scrape_scores(current_date)
+        all_games.extend(daily_games)
+        current_date += datetime.timedelta(days=1)
 
-    match_info = {
-        'Home Team': home_team_cleaned,
-        'Home Score': home_score,
-        'Visitor Score': away_score,
-        'Visiting Team': away_team_cleaned
-    }
-    match_data.append(match_info)
+    return all_games
 
-# Save the collected match data to a CSV file
-csv_file_path = 'game_data.csv'  # Updated file name for clarity
-with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
-    fieldnames = ['Home Team', 'Home Score', 'Visitor Score', 'Visiting Team']
-    writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+def save_to_csv(data, filename='game_data.csv'):
+    """Save game data to CSV in the specified format"""
+    with open(filename, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=['Home Team', 'Home Score', 'Visitor Score', 'Visiting Team'])
+        writer.writeheader()
+        writer.writerows(data)
 
-    writer.writeheader()  # Write the header
-    for data in match_data:
-        writer.writerow(data)  # Write each row
-
-print(f"Match data saved to {csv_file_path}")
-
-# Close the browser
-driver.quit()
+# Example usage:
+if __name__ == "__main__":
+    # Set your desired date range
+    season_start = datetime.datetime(2024, 11, 1)
+    season_end = datetime.datetime(2025, 3, 15)
+    
+    # Scrape the data
+    game_data = scrape_season(season_start, season_end)
+    
+    # Save to CSV
+    save_to_csv(game_data)
+    print(f"Successfully saved {len(game_data)} games to ncaa_results.csv")
