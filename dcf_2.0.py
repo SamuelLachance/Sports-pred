@@ -33,7 +33,7 @@ except AttributeError:
 warnings.filterwarnings("ignore")
 
 # ---------------- CONFIG ----------------------------------------------------
-FMP_API_KEY = "435820a51119704ed53f7e7fb8a0cfec"
+FMP_API_KEY = ""
 FMP_BASE = "https://financialmodelingprep.com/api/v3"
 HEADERS = {"User-Agent": "DCF-FMP/4.7"}
 
