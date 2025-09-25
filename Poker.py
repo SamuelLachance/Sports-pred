@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Single-file Poker Tournament Tracker + EV-first Decision Engine (v8.2)
+Single-file Poker Tournament Tracker + EV-first Decision Engine (v8.9)
 
-- Fast preflop now works reliably: villain-range sampling + LRU cache + quick fallback
-- Thresholding uses **villain equity divided by number of active players**:
-    • Decision/display threshold = (1 − hero_eq) / max(1, num_active_players)  (clamped to [0,1])
-- Strict raise/bet guard when equity < threshold unless FE≥50% AND raise-EV > call-EV
-- Uses deterministic seeds so advice is stable within a spot
-- Integrates GTO math: MDF-based FE, optimal bluff ratios on river, bucketing & betting-round reduction, mixed strategies.
+What’s new in v8.9 (FE removed):
+- Removed fold equity (FE) everywhere. No MDF FE model, no FE multipliers, no FE gates, no FE prints.
+- EV for bets/raises uses ONLY the called branch:
+    EV = bubble_factor * ( equity * (pot + invested_by_both) - hero_invest )
+- Aggression guard is strict: if equity < (villain_equity / active_players), we disallow bet/raise.
+- Kept river over-bluff damping (based on caller pot-odds) — it doesn't rely on FE.
+- Kept numeric EV maximization over dense legal size grids (bets & raises) for “most mathematical” sizes.
+- Preflop size still adapts by position & limpers (as a logged target), but final size is EV arg-max.
 
-Major changes in v8.2:
-  • Threshold:
-      - Replace prior villain-equity-only threshold with **villain_eq / players**.
-      - Printing: UI shows “Threshold (villain eq / players)”.
-  • GTO utilities:
-      - MDF, caller pot-odds from size, optimal bluff ratio, and FE requirement for pure bluffs
-        remain for sizing and bluff-cap math (river polar spots).
+Earlier updates preserved:
+- Threshold metric = villain equity divided by number of active players.
+- Confidence output removed.
+- Mixed strategies only for action selection (not size): size is always the EV arg-max.
 """
 
 import xml.etree.ElementTree as ET
@@ -195,52 +194,22 @@ class HandEvaluator:
         return value, category
 
 # ==========================================================
-# GTO Math Utilities (MDF, bluff ratio, FE requirements)
+# GTO Math Utilities (caller pot odds & bluff ratio)
 # ==========================================================
 class GTOUtils:
     @staticmethod
-    def mdf_from_size(bet: float, pot: float) -> float:
-        """Minimum Defense Frequency = pot / (pot + bet) = 1 / (1 + s)."""
-        if pot <= 0: return 0.0
-        s = max(0.0, bet / pot)
-        return 1.0 / (1.0 + s)
-
-    @staticmethod
     def caller_pot_odds_from_size(bet: float, pot: float) -> float:
-        """
-        Caller pot odds % when facing a bet size s = bet/pot:
-        pot_odds = s / (2s + 1)
-        """
+        """Caller pot odds = s / (2s + 1), where s = bet/pot."""
         if pot <= 0: return 0.0
         s = max(0.0, bet / pot)
         return s / (2.0 * s + 1.0)
 
     @staticmethod
     def optimal_bluff_ratio(bet: float, pot: float) -> float:
-        """
-        For a polar value/bluff mix on a single decision (river model),
-        optimal bluff: value ratio = s / (1 + s), with s = bet/pot.
-        """
+        """Polar mix single decision: optimal bluff:value ratio = s / (1 + s)."""
         if pot <= 0: return 0.0
         s = max(0.0, bet / pot)
         return s / (1.0 + s)
-
-    @staticmethod
-    def golden_ratio_check() -> float:
-        """
-        The 'meeting point' where MDF% == pot-odds% occurs at ~Phi (≈1.618 pot bet).
-        Not used directly for gating, but handy for sanity checks/logging.
-        """
-        return (1 + 5 ** 0.5) / 2  # Φ
-
-    @staticmethod
-    def required_fe_for_bluff(risk: float, reward: float) -> float:
-        """
-        Minimum fold equity to break even on a pure bluff:
-        FE*reward - (1-FE)*risk = 0 => FE = risk / (risk + reward)
-        """
-        denom = (risk + max(0.0, reward))
-        return max(0.0, min(1.0, (risk / denom) if denom > 0 else 1.0))
 
 # ==========================================================
 # RangeParser (supports '+', spans like A2s-A5s)
@@ -380,13 +349,9 @@ class EquityCalculator:
         if not vill_all:
             self._cache.set(key, 0.5); return 0.5
 
-        # Deterministic sampling
         seed = (hash(key) & 0xFFFFFFFF)
         rng = random.Random(seed)
-        if len(vill_all) > self.MAX_VILLAIN_SAMPLES:
-            vill = rng.sample(vill_all, self.MAX_VILLAIN_SAMPLES)
-        else:
-            vill = vill_all
+        vill = rng.sample(vill_all, self.MAX_VILLAIN_SAMPLES) if len(vill_all) > self.MAX_VILLAIN_SAMPLES else vill_all
 
         total = 0.0; valid = 0
         iters = self.PREFLOP_ITERS_PER if len(board_cards) < 3 else self.POSTFLOP_ITERS_PER
@@ -431,7 +396,7 @@ class EquityCalculator:
         return {hand: (wins[hand] + ties[hand]) / n_iterations for hand in hands}
 
 # ==========================================================
-# MonteCarloSimulator (kept; now faster defaults)
+# MonteCarloSimulator
 # ==========================================================
 class MonteCarloSimulator:
     def __init__(self, n_jobs: int = -1):
@@ -441,9 +406,7 @@ class MonteCarloSimulator:
         self.equity_calc = EquityCalculator()
 
     def _parse_range(self, range_str: str) -> List[str]:
-        if not range_str:
-            return []
-        return list(self.range_parser.parse_range(range_str))
+        return list(self.range_parser.parse_range(range_str)) if range_str else []
 
     def simulate_multiway_range_equity(self, hero: str, villain_ranges: List[str], board: str = "", n_iterations: int = 400) -> float:
         all_ranges = [self._parse_range(r) for r in villain_ranges]
@@ -474,7 +437,7 @@ class MonteCarloSimulator:
         return total / samples if samples else 0.5
 
 # ==========================================================
-# GTOSolver (light priors only) & ICM
+# GTOSolver (stub) & ICM
 # ==========================================================
 @dataclass
 class GameState:
@@ -533,7 +496,7 @@ class PreflopRangeModel:
         return cls.RFI.get(pos, cls.RFI["MP"])
 
 # ==========================================================
-# Decision Engine (v8.2) — GTO-integrated, villain-eq/players threshold
+# Decision Engine — EV-optimized sizing (no FE)
 # ==========================================================
 class PokerAIDecisionEngine:
     RANK_ORDER = {r:i for i,r in enumerate('23456789TJQKA')}
@@ -545,23 +508,20 @@ class PokerAIDecisionEngine:
         self.icm_calc = ICMCalculator()
         self.hand_eval = HandEvaluator()
         self.range_parser = RangeParser()
-        # Deterministic engine seed for stable spot advice
         self._rng = random.Random(0xA17E5)
 
-    # ---------- Threshold: villain equity / players (printed vs compared) ----------
+    # ---------- Threshold: villain equity / players ----------
     def printed_pot_odds(self, to_call: int, pot_size: int, hero_eq: float, num_players: int) -> float:
-        """Display value: (1 - hero_eq) / max(1, num_players)."""
         he = max(0.0, min(1.0, hero_eq))
         v = 1.0 - he
         return max(0.0, min(1.0, v / max(1, int(num_players))))
 
     def compare_pot_odds(self, to_call: int, pot_size: int, hero_eq: float, num_players: int) -> float:
-        """Decision threshold: (1 - hero_eq) / max(1, num_players)."""
         he = max(0.0, min(1.0, hero_eq))
         v = 1.0 - he
         return max(0.0, min(1.0, v / max(1, int(num_players))))
 
-    # ---------- “Theoretical” helpers ----------
+    # ---------- Helpers ----------
     @staticmethod
     def _bubble_pressure_factor(players_remaining: int, places_paid: int, hero_stack_bb: float) -> float:
         base = 1.0
@@ -584,13 +544,6 @@ class PokerAIDecisionEngine:
             elif v > 28 and p > 20: prof[seat] = 'lag'
             else: prof[seat] = 'tag'
         return prof
-
-    def _fe_profile_mult(self, profiles: List[str]) -> float:
-        if not profiles: return 1.0
-        mult = 1.0
-        for p in profiles:
-            mult *= {'nit':1.10,'tag':1.00,'lag':0.93,'station':0.85}.get(p,1.0)
-        return max(0.75, min(1.25, mult))
 
     def _eq_called_mult(self, profiles: List[str]) -> float:
         if not profiles: return 1.0
@@ -634,7 +587,7 @@ class PokerAIDecisionEngine:
                 pass
         return {"flush_draw": flush_draw, "straight_draw": straight_draw, "nutted": nutted}
 
-    # ---------- Bucketing (abstraction) ----------
+    # ---------- Bucketing ----------
     def _preflop_bucket(self, hero_cards: List[str]) -> int:
         if len(hero_cards) < 2: return 11
         r = '23456789TJQKA'
@@ -643,20 +596,20 @@ class PokerAIDecisionEngine:
         pair = (a[0] == b[0]); suited = (a[1] == b[1]); gap = abs(aR - bR)
         high = (a[0] in 'TJQKA') + (b[0] in 'TJQKA')
         if pair:
-            return min(5, max(0, aR))  # 0..5 cover 22..AA coarsely
+            return min(5, max(0, aR))
         if suited and gap == 1:
-            return 6  # suited connectors
+            return 6
         if suited and (a[0]=='A' or b[0]=='A'):
-            return 7  # Axs
+            return 7
         if high == 2 and suited:
-            return 8  # suited broadway
+            return 8
         if high == 2:
-            return 9  # offsuit broadway
+            return 9
         if suited:
-            return 10  # weak suited
-        return 11  # trash
+            return 10
+        return 11
 
-    # ---------- Preflop villain range adapter ----------
+    # ---------- Villain ranges ----------
     def _default_pos_range(self, pos: str) -> str:
         return PreflopRangeModel.by_position(pos)
 
@@ -670,7 +623,6 @@ class PokerAIDecisionEngine:
             hands = max(1, s.get('hands_played', 1))
             vpip = 100.0 * s.get('vpip', 0) / hands
             pfr  = 100.0 * s.get('preflop_raises', 0) / hands
-            # widen/narrow heuristically
             if vpip > 30 and pfr < 12:
                 base += ",A2o-A5o,86s,75s,64s,53s"
             elif pfr > 20:
@@ -680,14 +632,14 @@ class PokerAIDecisionEngine:
             out = [self._default_pos_range('MP')]
         return out
 
-    # ---------- Equity estimation with bucketing + multiway ----------
+    # ---------- Equity estimation ----------
     def _preflop_quick_strength(self, hero_cards: List[str]) -> float:
         if len(hero_cards) < 2: return 0.5
         r = '23456789TJQKA'
         a, b = hero_cards[0][0], hero_cards[1][0]
         s = (hero_cards[0][1] == hero_cards[1][1])
         ia, ib = r.index(a), r.index(b)
-        hi, lo = max(ia, ib), min(ia, ib)
+        hi = max(ia, ib)
         pair = (ia == ib)
         base = 0.50
         if pair:
@@ -722,62 +674,101 @@ class PokerAIDecisionEngine:
             eq = 0.9 * eq if num_players <= 4 else 0.8 * eq
         return eq
 
-    # ---------- FE model via MDF ----------
-    def _fe_mdf(self, pot_before: float, face_amt: float, n_to_act: int,
-                wetness: float, prof_mult: float, blocker_mult: float) -> float:
-        if face_amt <= 0 or pot_before <= 0:
-            return 0.0
-        mdf = GTOUtils.mdf_from_size(face_amt, pot_before)  # pot/(pot+bet)
-        # one opponent FE = 1 - MDF; multiway exponent
-        fe1 = max(0.0, min(1.0, 1.0 - mdf))
-        fe_all = 1.0 - (1.0 - fe1) ** max(1, n_to_act)
-        fe_all *= (1.0 - 0.25 * max(0.0, min(1.0, wetness)))
-        fe_all *= prof_mult
-        fe_all *= blocker_mult
-        return max(0.0, min(0.95, fe_all))
+    # ---------- Size grids & optimizers (no FE) ----------
+    @staticmethod
+    def _linear_grid(start: int, end: int, step: int) -> List[int]:
+        if end < start or step <= 0: return []
+        vals = list(range(start, end + 1, step))
+        if vals and vals[-1] != end:
+            vals.append(end)
+        return vals
 
-    def _blocker_boost(self, hero_cards: List[str], board: List[str]) -> float:
-        if len(board) < 3 or not hero_cards: return 1.0
-        suits = [c[1] for c in board]
-        suit_counts = {s:suits.count(s) for s in 'shdc'}
-        mult = 1.0
-        for s, cnt in suit_counts.items():
-            if cnt >= 2 and ('A'+s) in hero_cards:
-                mult *= 1.05
-            ranks = set(c[0] for c in board)
-        if len(ranks) == 3 and max(suit_counts.values()) <= 1:
-            if any(card[0] in 'AKQ' for card in hero_cards):
-                mult *= 1.02
-        return max(1.0, min(1.10, mult))
+    @staticmethod
+    def _uniq_sorted(ints: List[int]) -> List[int]:
+        return sorted(set([v for v in ints if isinstance(v, int) and v > 0]))
 
-    # ---------- Candidate sizes ----------
-    def _candidate_bet_sizes(self, pot: int, min_bet: int, max_bet: int, stack: int,
-                             street: str, equity: float, wetness: float, draws: Dict[str,bool], spr: float) -> List[int]:
-        fracs = [0.25,0.33,0.5,0.66,1.0]
-        strong = equity > 0.72 or draws.get("nutted", False)
-        semi = (draws.get("flush_draw") or draws.get("straight_draw")) and equity > 0.40
-        if strong or (wetness > 0.6 and (equity > 0.6 or semi)) or (street in ("turn","river") and semi):
-            fracs.extend([1.25,1.5])
-        sizes = []
-        for f in fracs:
-            target = int(round(pot * f))
-            s = min(stack, max(min_bet, min(target, max_bet)))
-            if s >= min_bet: sizes.append(s)
-        sizes.append(min_bet)
-        return sorted(set(sizes))
+    def _bet_grid(self, pot: int, min_bet: int, cap: int) -> List[int]:
+        anchors = []
+        for f in [0.25, 0.33, 0.50, 0.66, 0.75, 1.00, 1.25, 1.50, 2.00, 2.50]:
+            anchors.append(int(round(pot * f)))
+        anchors = [min(cap, max(min_bet, a)) for a in anchors]
+        step = max(1, int(max(1, pot) / 40))
+        linear = self._linear_grid(min_bet, cap, step)
+        return self._uniq_sorted(anchors + linear + [min_bet, cap])
 
-    def _candidate_raise_to(self, to_call: int, min_raise: int, max_raise: int, stack: int, equity: float, spr: float) -> List[int]:
-        mults = [2.2,2.5,3.0,3.5]
-        if equity > 0.65: mults.append(4.0)
-        if spr <= 1.6: mults.append(10.0)
-        sizes = []
-        base = max(1, to_call)
-        for m in mults:
-            s = int(round(base * m))
-            s = min(stack, max(min_raise, min(s, max_raise)))
-            if s >= min_raise: sizes.append(s)
-        sizes.append(min_raise); sizes.append(min(stack, max_raise))
-        return sorted(set(sizes))
+    def _raise_to_grid(self, pot_before: int, to_call: int, current_bet_high: int,
+                       min_raise: int, cap: int, big_blind: int) -> List[int]:
+        vals: List[int] = []
+        if to_call > 0:
+            for m in [2.2, 2.5, 3.0, 3.5, 4.5, 5.5]:
+                Y = int(round(m * to_call))
+                Y = min(cap, max(min_raise, Y))
+                vals.append(Y)
+        if pot_before > 0 and to_call > 0:
+            base = pot_before + 2 * to_call
+            for f in [1.0, 1.25, 1.50, 2.0]:
+                Y = current_bet_high + int(round(f * base))
+                vals.append(min(cap, max(min_raise, Y)))
+        step = max(1, int(max(1, big_blind) / 2))
+        vals += self._linear_grid(min_raise, cap, step)
+        return self._uniq_sorted(vals + [min_raise, cap])
+
+    def _optimize_bet_size(self, pot: int, min_bet: int, max_bet: int, stack: int,
+                           stage: str, equity: float, spr: float,
+                           eq_called_mult: float, bubble_factor: float,
+                           big_blind: int) -> Tuple[int, float]:
+        cap = min(stack, max_bet)
+        if pot <= 0 or min_bet <= 0 or cap <= 0:
+            return 0, float('-inf')
+        grid = self._bet_grid(pot, min_bet, cap)
+        best_ev = float('-inf'); best_size = 0
+        for B in grid:
+            # Called-branch EV only
+            nonfold_ev = (equity * (pot + 2*B) - B) * eq_called_mult
+            ev_raw = bubble_factor * nonfold_ev
+
+            # River bluff damping (independent of FE)
+            if stage == 'river':
+                caller_po = GTOUtils.caller_pot_odds_from_size(B, pot)
+                if equity < caller_po - 1e-6:
+                    ev_raw *= (0.98 - 0.20 * max(0.0, (caller_po - equity)))
+
+            ev = ev_raw / max(1.0, big_blind)
+            if ev > best_ev:
+                best_ev, best_size = ev, B
+        return best_size, best_ev
+
+    # ---------- Preflop: position & limper-aware target (for logging) ----------
+    @staticmethod
+    def _pos_is_ip(pos: str) -> bool: return pos == "BTN"
+    @staticmethod
+    def _pos_is_semi_ip(pos: str) -> bool: return pos == "CO"
+    @staticmethod
+    def _pos_is_oop(pos: str) -> bool: return pos in {"UTG","MP","SB","BB"}
+
+    def _count_preflop_limpers(self, positions: Dict[str,str], active_players: List[str],
+                               player_bets: Dict[str,int], hero_seat: str,
+                               big_blind: int, current_bet_high: int) -> int:
+        if big_blind <= 0 or current_bet_high > big_blind:
+            return 0
+        n = 0
+        for seat in active_players:
+            if seat == hero_seat: continue
+            pos = positions.get(seat, "")
+            if pos in ("SB","BB"): continue
+            if player_bets.get(seat, 0) >= big_blind:
+                n += 1
+        return n
+
+    def _preflop_target_total(self, hero_pos: str, big_blind: int, n_limpers: int) -> int:
+        if big_blind <= 0: return 0
+        base_open = {"UTG": 3.2, "MP": 3.0, "CO": 2.5, "BTN": 2.0, "SB": 4.0, "BB": 3.6}
+        if self._pos_is_ip(hero_pos): per_limper = 0.50
+        elif self._pos_is_semi_ip(hero_pos): per_limper = 0.75
+        else: per_limper = 1.75 if hero_pos == "SB" else 1.50
+        base_mult = base_open.get(hero_pos, 2.8)
+        target_mult = base_mult + per_limper * max(0, n_limpers)
+        return int(round(target_mult * big_blind))
 
     def _gto_weights(self, pos: str, stack_bb: float) -> Dict[str,float]:
         pri = {"raise":0.5,"call":0.3,"fold":0.2}
@@ -816,20 +807,17 @@ class PokerAIDecisionEngine:
         profiles_map = self._opponent_profiles(table_info.get('player_actions', {}), table_info.get('active_players', []), str(hand_info['hero_seat']))
         profiles_to_act = [profiles_map.get(seat, 'tag') for seat in table_info.get('active_players', []) if seat != str(hand_info['hero_seat'])]
 
-        # Villain ranges: position priors + profile-based widening/narrowing
         villain_ranges = self._adapt_villain_ranges(positions, table_info.get('active_players', []), str(hand_info['hero_seat']), table_info.get('player_actions', {}))
 
         equity = self._estimate_equity(hero_cards, board_cards, num_players, hero_position, villain_ranges)
 
-        # Threshold (villain equity / players) — printed & compared
-        pot_odds_print = self.printed_pot_odds(to_call, pot_size, equity, num_players)
-        pot_odds_cmp   = self.compare_pot_odds(to_call, pot_size, equity, num_players)
+        # Threshold (villain equity / players)
+        threshold_print = self.printed_pot_odds(to_call, pot_size, equity, num_players)
+        threshold_cmp   = self.compare_pot_odds(to_call, pot_size, equity, num_players)
 
-        wetness = self._board_texture(board_cards)
+        wetness = self._board_texture(board_cards)  # retained for potential future logic
         draws = self._draw_profile(hero_cards, board_cards)
-        fe_profile_mult = self._fe_profile_mult(profiles_to_act)
         eq_called_mult = self._eq_called_mult(profiles_to_act)
-        blocker_boost = self._blocker_boost(hero_cards, board_cards)
         bubble_factor = self._bubble_pressure_factor(tinfo.get('players_remaining', 0), tinfo.get('places_paid', 0), hero_stack / max(1, big_blind))
         spr = (hero_stack / max(1, pot_size)) if pot_size > 0 else 99.0
 
@@ -866,91 +854,64 @@ class PokerAIDecisionEngine:
             action_ev_raw['call'] = ev_call
             breakdown['call'] = {"pot": pot_size, "to_call": to_call, "equity": equity, "eq_called_mult": eq_called_mult, "bubble": bubble_factor}
 
-        # --- Bet EV (with river mixing cap via optimal bluff ratio)
-        if 'bet' in avail and max_bet > 0:
-            best = -1e18; best_size = 0; best_fe = 0.0; best_raw = -1e18
-            for B in self._candidate_bet_sizes(pot_size, min_bet, max_bet, hero_stack, stage, equity, wetness, draws, spr):
-                pot_before = pot_size
-                fe = self._fe_mdf(pot_before, B, n_to_act=max(1, num_players-1), wetness=wetness,
-                                  prof_mult=fe_profile_mult, blocker_mult=blocker_boost)
-                nonfold_ev = (equity * (pot_before + 2*B) - B) * eq_called_mult
-                ev_raw = bubble_factor * (fe * pot_before + (1 - fe) * nonfold_ev)
-
-                # On river with polar constructions, cap bluffs by optimal ratio ≈ s/(1+s)
-                if stage == 'river':
-                    s = B / max(1.0, pot_before)
-                    # If equity < caller's pot-odds for this size, treat action as bluff-heavy; soft cap
-                    caller_po = GTOUtils.caller_pot_odds_from_size(B, pot_before)
-                    if equity < caller_po - 1e-6:
-                        ev_raw *= (0.98 - 0.20 * max(0.0, (caller_po - equity)))
-
-                ev = ev_raw / max(1.0, big_blind)
-                if spr <= 1.6 and (draws.get("nutted") or equity > 0.64):
-                    ev *= 1.02; ev_raw *= 1.02
-                if ev > best:
-                    best, best_size, best_fe, best_raw = ev, B, fe, ev_raw
+        # --- Bet EV (optimized size, no FE)
+        if 'bet' in avail and stage != 'preflop' and max_bet > 0:
+            best_size, best_ev_bb = self._optimize_bet_size(
+                pot=pot_size, min_bet=min_bet, max_bet=max_bet, stack=hero_stack,
+                stage=stage, equity=equity, spr=spr,
+                eq_called_mult=eq_called_mult, bubble_factor=bubble_factor,
+                big_blind=big_blind
+            )
             if best_size > 0:
-                action_ev['bet'] = best
-                action_ev_raw['bet'] = best_raw
-                breakdown['bet'] = {"size": best_size, "fe": best_fe}
+                # STRICT GUARD vs threshold (no FE escape)
+                if equity + 1e-9 < threshold_cmp:
+                    best_size = 0
+                else:
+                    # recompute ev_raw for reporting
+                    ev_raw = bubble_factor * ((equity * (pot_size + 2*best_size) - best_size) * eq_called_mult)
+                    action_ev['bet'] = best_ev_bb
+                    action_ev_raw['bet'] = ev_raw
+                    breakdown['bet'] = {"size": best_size}
 
-        # --- Raise EV with hard gates
-        if can_raise and max_raise > 0 and to_call > 0:
-            best = -1e18; best_to = 0; best_fe = 0.0; best_raw = -1e18
-            for Y in self._candidate_raise_to(max(1, to_call), max(1, min_raise), max_raise, hero_stack, equity, spr):
+        # --- Raise EV (optimized size, no FE)
+        if can_raise and max_raise > 0:
+            cap = min(hero_stack, max_raise)
+            grid = self._raise_to_grid(
+                pot_before=pot_size, to_call=max(1, to_call) if to_call > 0 else 1,
+                current_bet_high=current_bet_high, min_raise=max(1, min_raise),
+                cap=cap, big_blind=big_blind
+            )
+
+            if stage == 'preflop' and current_bet_high <= big_blind:
+                n_limpers = self._count_preflop_limpers(
+                    positions, table_info.get('active_players', []),
+                    table_info.get('player_bets', {}), str(hand_info['hero_seat']),
+                    big_blind, current_bet_high
+                )
+                breakdown['preflop_limpers'] = n_limpers
+                breakdown['preflop_target_to'] = self._preflop_target_total(hero_position, big_blind, n_limpers)
+
+            best_bb = float('-inf'); best_to = 0; best_raw = float('-inf')
+            for Y in grid:
                 hero_add = max(0, Y - hero_bet_street)
                 vill_face = max(0, Y - current_bet_high)
-                pot_before = pot_size
-                fe = self._fe_mdf(pot_before, vill_face, n_to_act=max(1, num_players-1), wetness=wetness,
-                                  prof_mult=fe_profile_mult, blocker_mult=blocker_boost)
-                nonfold_ev = (equity * (pot_before + hero_add + vill_face) - hero_add) * eq_called_mult
 
-                # FE requirement for (semi)bluff raises when equity < threshold
-                risk   = hero_add
-                reward = pot_before + vill_face
-                fe_req = GTOUtils.required_fe_for_bluff(risk, reward)
-                gated = False
-                if equity + 1e-9 < pot_odds_cmp:
-                    if not (fe >= max(0.50, fe_req) and nonfold_ev > action_ev_raw.get('call', -1e18)):
-                        gated = True
-
-                if gated:
+                # STRICT GUARD vs threshold (no FE escape hatch)
+                if equity + 1e-9 < threshold_cmp:
                     continue
 
-                ev_raw = bubble_factor * (fe * pot_before + (1 - fe) * nonfold_ev)
-                ev = ev_raw / max(1.0, big_blind)
-                if spr <= 1.6 and (draws.get("nutted") or equity > 0.64):
-                    ev *= 1.02; ev_raw *= 1.02
-                if ev > best:
-                    best, best_to, best_fe, best_raw = ev, Y, fe, ev_raw
+                nonfold_ev = (equity * (pot_size + hero_add + vill_face) - hero_add) * eq_called_mult
+                ev_raw = bubble_factor * nonfold_ev
+                ev_bb = ev_raw / max(1.0, big_blind)
+                if ev_bb > best_bb:
+                    best_bb, best_to, best_raw = ev_bb, Y, ev_raw
+
             if best_to > 0:
-                action_ev['raise'] = best
+                action_ev['raise'] = best_bb
                 action_ev_raw['raise'] = best_raw
-                breakdown['raise'] = {"to": best_to, "fe": best_fe}
+                breakdown['raise'] = {"to": best_to}
 
-        # --- All-in option (kept, but gated)
-        if can_raise and max_raise >= hero_stack and hero_stack > 0:
-            Y = hero_bet_street + hero_stack
-            hero_add = hero_stack
-            vill_face = max(0, Y - current_bet_high)
-            pot_before = pot_size
-            fe = self._fe_mdf(pot_before, vill_face, n_to_act=max(1, num_players-1), wetness=wetness,
-                              prof_mult=fe_profile_mult, blocker_mult=blocker_boost)
-            nonfold_ev = (equity * (pot_before + hero_add + vill_face) - hero_add) * eq_called_mult
-            gated = False
-            if equity + 1e-9 < pot_odds_cmp:
-                risk, reward = hero_add, pot_before + vill_face
-                fe_req = GTOUtils.required_fe_for_bluff(risk, reward)
-                if not (fe >= max(0.50, fe_req) and nonfold_ev > action_ev_raw.get('call', -1e18)):
-                    gated = True
-            if not gated:
-                ev_raw = bubble_factor * (fe * pot_before + (1 - fe) * nonfold_ev)
-                ev = ev_raw / max(1.0, big_blind)
-                action_ev['allin'] = ev
-                action_ev_raw['allin'] = ev_raw
-                breakdown['allin'] = {"to": Y, "fe": fe}
-
-        # --- Position/stack priors as tiebreakers (kept)
+        # --- Position/stack priors as tiebreakers (actions only; size already chosen by arg-max)
         gto = self._gto_weights(hero_position, max(1.0, hero_stack / max(1, big_blind)))
         scores: Dict[str, float] = {}
         k_tiebreak = 0.3
@@ -959,34 +920,20 @@ class PokerAIDecisionEngine:
         for a in acts:
             scores[a] = action_ev[a] + k_tiebreak * (gto.get(a, 0.0) - uniform)
 
-        # --- Safety adjustments
+        # Safety nudges (no FE logic involved)
         if 'call' in scores and action_ev_raw.get('call', -1e9) / max(1.0, big_blind) < -1e-6 and 'fold' in scores:
             scores['call'] = min(scores['call'], scores.get('fold', 0.0) - 0.1)
-        if 'call' in scores and equity >= pot_odds_cmp + 1e-6:
+        if 'call' in scores and equity >= threshold_cmp + 1e-6:
             scores['call'] = scores.get('call', 0.0) + 0.1
         if 'check' in scores and to_call == 0:
             scores['check'] = max(scores.get('check', 0.0), scores.get('fold', -1e9) + 0.01)
 
-        # HARD guard vs raising/betting when equity < threshold (villain_eq / players)
-        below_po = equity + 1e-9 < pot_odds_cmp
-        if below_po:
-            if 'raise' in scores and 'raise' in breakdown:
-                raise_fe = breakdown['raise'].get('fe', 0.0)
-                raise_ev = action_ev_raw.get('raise', -1e9)
-                call_ev = action_ev_raw.get('call', -1e9)
-                if not (raise_fe >= 0.50 and raise_ev > call_ev):
-                    scores['raise'] = min(scores['raise'], scores.get('call', -1e9) - 0.05, scores.get('fold', 0.0) - 0.05)
-            if to_call == 0 and 'bet' in scores and 'bet' in breakdown:
-                if breakdown['bet'].get('fe', 0.0) < 0.50:
-                    scores['bet'] = min(scores['bet'], scores.get('check', -1e9) - 0.05)
-
-        # --- Pick
+        # --- Pick action
         if scores:
             best_val = max(scores.values())
             near = {a: s for a, s in scores.items() if best_val - s <= 0.03 + 1e-9}
             if len(near) > 1:
                 acts2, scs2 = zip(*near.items())
-                # Softmax sampling for mixed strategies
                 def _softmax(xs, t=0.15):
                     m = max(xs); e = [math.exp((x - m)/max(1e-6, t)) for x in xs]; z = sum(e) or 1.0
                     return [v/z for v in e]
@@ -1000,7 +947,6 @@ class PokerAIDecisionEngine:
             else:
                 best_action = max(scores.items(), key=lambda kv: kv[1])[0]
         else:
-            # Ensure we ALWAYS recommend preflop/postflop
             best_action = 'check' if 'check' in avail else ('call' if 'call' in avail else ('raise' if 'raise' in avail else 'fold'))
 
         amount = 0
@@ -1009,24 +955,21 @@ class PokerAIDecisionEngine:
         elif best_action == 'bet': amount = int(breakdown.get('bet', {}).get('size', max(min_bet, pot_size//3)))
         elif best_action == 'allin': amount = hero_stack
 
-        ordered = sorted(scores.values(), reverse=True) if scores else [0.0]
-        edge = (ordered[0] - ordered[1]) if len(ordered) > 1 else abs(ordered[0])
-        confidence = max(0.1, min(0.95, 0.55 + 0.1 * max(0.0, edge)))
-
         return {
             "action": best_action,
             "amount": int(amount) if isinstance(amount, (int, float)) else amount,
-            "confidence": confidence,
             "reasoning": (
-                "Theory-aligned: MDF-based FE, river bluff caps, 3-raise reduction, bucketing, "
-                "strict raise guard (equity < villain-eq/players requires FE≥req and EV(raise)>EV(call))."
+                "Sizes chosen by numeric EV maximization (called-branch only), "
+                "strict equity-threshold guard (villain_eq / players), river bluff damping, "
+                "and preflop position/limper-aware target for context."
             ),
             "equity": equity,
-            "pot_odds": pot_odds_print,        # now: villain equity / players (display)
-            "pot_odds_compare": pot_odds_cmp,  # now: villain equity / players (decision)
+            "pot_odds": threshold_print,
+            "pot_odds_compare": threshold_cmp,
             "gto_weights": self._gto_weights(hero_position, max(1.0, hero_stack / max(1, big_blind))),
             "ev_scores": {k: v for k, v in scores.items()},   # in bb
-            "ev_raw": {k: v for k, v in action_ev_raw.items()}# in chips
+            "ev_raw": {k: v for k, v in action_ev_raw.items()},# in chips
+            "breakdown": breakdown
         }
 
 # ==========================================================
@@ -1062,7 +1005,6 @@ class AsyncDecisionWorker:
 class PokerTournamentTracker:
     def __init__(self):
         self.tournament_id = None
-               # Tournament info
         self.tournament_name = ""
         self.buy_in = 0.0
         self.fee = 0.0
@@ -1093,7 +1035,6 @@ class PokerTournamentTracker:
         self.hand_history_id = None
         self.dealer_seat = None
         self.small_blind_seat = None
-               # Player/table state
         self.big_blind_seat = None
         self.hero_seat = None
         self.hero_uuid = None
@@ -1203,7 +1144,6 @@ class PokerTournamentTracker:
         amt = decision['amount']
         amt_str = f" ({amt})" if isinstance(amt, (int, float)) and amt > 0 else ""
         print(f"🎯 Recommended Action: {decision['action'].upper()}{amt_str}")
-        print(f"📊 Confidence: {decision['confidence']:.1%}")
         print(f"⚖️  Equity: {decision['equity']:.1%} | Threshold (villain eq / players): {decision['pot_odds']:.1%} (compare {decision.get('pot_odds_compare', 0):.1%})")
         print(f"🎲 GTO Weights: {decision.get('gto_weights', {})}")
         evbb = decision.get('ev_scores', {})
@@ -1211,6 +1151,9 @@ class PokerTournamentTracker:
         if evbb or evch:
             print("📈 EV (bb):", {k: round(v, 3) for k,v in evbb.items()})
             print("💰 EV (chips):", {k: int(v) for k,v in evch.items()})
+        bd = decision.get('breakdown', {})
+        if 'preflop_limpers' in bd:
+            print(f"👥 Limpers counted preflop: {bd['preflop_limpers']} (target total ≈ {bd.get('preflop_target_to', 0)})")
         print(f"💡 Reasoning: {decision.get('reasoning', '')}")
         print("=" * 80)
         self._print_strategic_advice(decision, state)
@@ -1388,7 +1331,8 @@ class PokerTournamentTracker:
             if tinfo is not None: self._update_tournament_state(tinfo)
 
         active_change = changes.find('.//ActiveChange')
-        if active_change is not None: self._process_active_change(active_change)
+        if active_change is not None:
+            self._process_active_change(active_change)
 
         if not self._saw_pots_change_in_frame and self._local_pot_delta:
             self.pot_amount += self._local_pot_delta
@@ -1716,7 +1660,6 @@ class PokerTournamentTracker:
         print("-" * 80)
         amt = decision['amount']; amt_str = f" ({amt})" if isinstance(amt, (int, float)) and amt > 0 else ""
         print(f"🎯 Recommended Action: {decision['action'].upper()}{amt_str}")
-        print(f"📊 Confidence: {decision['confidence']:.1%}")
         print(f"⚖️  Equity: {decision['equity']:.1%} | Threshold (villain eq / players): {decision['pot_odds']:.1%} (compare {decision.get('pot_odds_compare', 0):.1%})")
         print(f"🎲 GTO Weights: {decision.get('gto_weights', {})}")
         evbb = decision.get('ev_scores', {})
@@ -1724,37 +1667,44 @@ class PokerTournamentTracker:
         if evbb or evch:
             print("📈 EV (bb):", {k: round(v, 3) for k,v in evbb.items()})
             print("💰 EV (chips):", {k: int(v) for k,v in evch.items()})
+        bd = decision.get('breakdown', {})
+        if 'preflop_limpers' in bd:
+            print(f"👥 Limpers counted preflop: {bd['preflop_limpers']} (target total ≈ {bd.get('preflop_target_to', 0)})")
         print(f"💡 Reasoning: {decision.get('reasoning', '')}")
         print("=" * 80)
         self._print_strategic_advice(decision, state)
 
     def _print_strategic_advice(self, decision: Dict[str, Any], state: Dict[str, Any]):
         tips = []
-        eq = decision['equity']; po = decision.get('pot_odds_compare', 0.0); act = decision['action']
+        eq = decision['equity']; thr = decision.get('pot_odds_compare', 0.0); act = decision['action']
         stack_bb = state['hero']['stack'] / max(1, state['hand']['big_blind_amount'])
 
-        if eq > po + 0.2: tips.append("✅ Very strong edge—prefer larger value sizes.")
-        elif eq > po + 0.1: tips.append("✅ Positive EV—value bet or raise is good.")
-        elif eq > po: tips.append("👍 Slight edge—standard continue.")
-        elif eq > po - 0.05: tips.append("⚠️ Marginal—control pot size.")
-        else: tips.append("❌ Negative EV—tighten or fold.")
+        if eq + 1e-9 < thr:
+            if act in ('raise','bet','allin'):
+                tips.append("❌ Equity below threshold—aggression should be blocked. (Check/call/fold preferred)")
+            else:
+                tips.append("❌ Equity below threshold—tighten up.")
+        else:
+            if eq > thr + 0.2: tips.append("✅ Strong edge—larger EV-max sizes are warranted.")
+            elif eq > thr + 0.1: tips.append("✅ Positive EV—apply pressure.")
+            elif eq > thr: tips.append("👍 Slight edge—continue.")
 
-        if stack_bb < 10: tips.append("💎 Short stack—lean push/fold in high-pressure spots.")
+        if stack_bb < 10: tips.append("💎 Short stack—favor push/fold lines.")
         elif stack_bb < 20: tips.append("📉 Mid-short—selective aggression.")
-        elif stack_bb > 50: tips.append("📈 Big stack—apply pressure vs capped ranges.")
+        elif stack_bb > 50: tips.append("📈 Big stack—pressure capped ranges.")
 
         pos = state['table']['positions'].get(str(state['hand']['hero_seat']), '')
-        if pos in ('BTN','CO'): tips.append("🎯 In position—add thin value and bluffs.")
+        if pos in ('BTN','CO'): tips.append("🎯 In position—realize equity, take thin value.")
         if pos in ('SB',): tips.append("🛡️ OOP from SB—avoid bloating marginal hands.")
 
         if act == 'raise':
-            tips.append("🃏 Raise cleared FE & EV thresholds.")
+            tips.append("🃏 Raise passes strict equity threshold and maximizes EV (called branch).")
         elif act == 'call':
-            tips.append("📊 Call clears the threshold; plan future streets.")
+            tips.append("📊 Call clears threshold; plan future streets.")
         elif act == 'bet':
-            tips.append("📏 Bet size chosen vs MDF / FE model.")
+            tips.append("📏 Bet size chosen by EV arg-max (no FE).")
         elif act == 'fold':
-            tips.append("🔒 Fold preserves chips for better spots.")
+            tips.append("🔒 Protect stack for higher-EV spots.")
 
         if tips:
             print("\nStrategic Insights:")
@@ -1793,8 +1743,7 @@ def websocket_start(flow): print("WebSocket connection established")
 def websocket_end(flow): print("WebSocket connection closed")
 
 if __name__ == "__main__":
-    print("✅ Poker AI loaded (v8.2)")
-    print("• Threshold switched to (villain equity / active players) for decisions + display")
-    print("• Strict raise/bet guard when equity < threshold unless FE≥50% AND EV(raise)>EV(call)")
-    print("• MDF-based FE, river bluff caps, bucketing, mixed strategies, and sensible size reduction")
-    print("• Fast preflop equity via sampled ranges + cache; robust XML parsing")
+    print("✅ Poker AI loaded (v8.9)")
+    print("• No fold equity used anywhere. Aggression gated purely by equity ≥ (villain_eq / players).")
+    print("• Sizes chosen by numeric EV maximization on the called branch only.")
+    print("• Preflop keeps position/limper-aware target; final size is EV arg-max.")
