@@ -2282,6 +2282,7 @@ class PokerTournamentTracker:
         print(f"Pot: {state['hand']['pot_amount']} | To call: {state['hero']['to_call']}")
         print(f"Stack: {state['hero']['stack']} | Position: {pos}")
         print(f"Equity: {decision['equity']:.1%} | Threshold: {decision['pot_odds']:.1%} (compare {decision.get('pot_odds_compare', 0):.1%})")
+        print(f"*** RECOMMENDED ACTION: {decision['action'].upper()} {decision['amount'] if decision['amount'] > 0 else ''} ***")
 
     def _decision_key(self) -> Tuple[Any, ...]:
         return (
@@ -2842,7 +2843,6 @@ class PokerTournamentTracker:
         decision = self.last_decision
         state = self.get_game_state_summary()
         pos = state['table']['positions'].get(str(state['hand']['hero_seat']), 'Unknown')
-        # Only print game state + equity information
         print(f"Hand: #{state['hand']['number']} | Stage: {state['hand']['stage'].upper()}")
         print(f"Hero: {state['hand']['hero_cards']} | Board: {state['hand']['community_cards']}")
         print(f"Pot: {state['hand']['pot_amount']} | To call: {state['hero']['to_call']}")
