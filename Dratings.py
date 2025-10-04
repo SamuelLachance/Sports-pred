@@ -101,6 +101,47 @@ def dratings_cbb():
 
     return tips
 
+def dratings_cfb():
+    url = 'https://www.dratings.com/predictor/ncaa-football-predictions/'
+    page = requests.get(url)
+    soup = BeautifulSoup(page.content, "html.parser")
+    table = soup.find("tbody", class_="table-body")
+    rows = table.find_all('tr')
+
+    tips = []
+
+    for row in rows:
+        try:
+            data = row.find_all("td")
+
+            date = data[0].find('span').get_text()
+            date_object = datetime.strptime(date, "%m/%d/%Y")
+            formatted_date = date_object.strftime("%Y-%m-%d")
+
+            teams = data[1].find_all('a')
+            team_a = teams[0].get_text()
+            team_b = teams[1].get_text()
+
+            percentages = data[2].find_all('span')
+            team_a_per = float(percentages[0].get_text().replace('%', "")) / 100
+            team_b_per = float(percentages[1].get_text().replace('%', "")) / 100
+
+            predicted_winner = team_b if team_b_per > team_a_per else team_a
+
+            tip = {
+                "date": formatted_date,
+                "away_team": team_a,
+                "home_team": team_b,
+                "away_team_percentage": team_a_per,
+                "home_team_percentage": team_b_per
+            }
+            tips.append(tip)
+        except Exception as e:
+            print(f"Error processing row: {e}")
+            continue
+
+    return tips
+
 
 def extract_team_data(json_data,predict):
     # List to store extracted data
@@ -296,7 +337,7 @@ def merge_dratings_and_odds(dratings_df, odds_df, sports):
         sheet = spreadsheet.worksheet(sheet_name)
 
         # Clear existing data
-        #sheet.clear()
+        sheet.clear()
 
         # Append headers if the first row is empty
         if not sheet.row_values(1):
@@ -324,7 +365,36 @@ def merge_dratings_and_odds(dratings_df, odds_df, sports):
         sheet = spreadsheet.worksheet(sheet_name)
 
         # Clear existing data
-        #sheet.clear()
+        sheet.clear()
+
+        # Append headers if the first row is empty
+        if not sheet.row_values(1):
+            sheet.append_row(merged_df.columns.tolist())  # Add headers
+
+        # Convert DataFrame to a list of lists for the data rows
+        data = merged_df.values.tolist()
+
+        # Append the data rows to the sheet
+        sheet.append_rows(data)  # Efficiently append the rows
+
+    if sports == "NCAAF" :
+        merged_df.dropna(inplace=True)
+        # Use credentials to create a client to interact with the Google Drive API
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('creds.json', scope)
+        client = gspread.authorize(creds)
+
+        # Open the spreadsheet by its key
+        spreadsheet_id = '1bnLc2cg2QnHDF4CZn2BLYpf4EIpCP57mtUefJfc7xug'
+        spreadsheet = client.open_by_key(spreadsheet_id)
+
+        sheet_name = 'Dratings'
+        
+        # Select the first sheet
+        sheet = spreadsheet.worksheet(sheet_name)
+
+        # Clear existing data
+        sheet.clear()
 
         # Append headers if the first row is empty
         if not sheet.row_values(1):
@@ -344,7 +414,7 @@ def convert_to_dataframe(data):
     return df
 
 def main():
-    sports = "NCAAB"
+    sports = "NCAAF"
     date = datetime.today().date()
     print(date)
 
@@ -353,6 +423,8 @@ def main():
         nhl_dratings_df = convert_to_dataframe(dratings_nhl())
     if sports == "NCAAB":
         nhl_dratings_df = convert_to_dataframe(dratings_cbb())
+    if sports == "NCAAF":
+        nhl_dratings_df = convert_to_dataframe(dratings_cfb())
         
 
     # Save nhl_odds_df to CSV if it's not None
