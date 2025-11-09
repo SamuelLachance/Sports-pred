@@ -136,7 +136,7 @@ def scrape_nhl_data():
         team_id = team['id']
         team_id_dict[team_id] = team_name
 
-        game_metadata = requests.get(f"https://api-web.nhle.com/v1/club-schedule-season/{team['triCode']}/20242025").json()
+        game_metadata = requests.get(f"https://api-web.nhle.com/v1/club-schedule-season/{team['triCode']}/20252026").json()
 
         for game in game_metadata.get('games', []):
             if game['gameType'] == 2 and game['gameState'] == 'OFF':
@@ -584,6 +584,7 @@ def calculate_ev(model_prob, vegas_prob):
 
 def fetch_odds_data(date):
     base_url = f"https://www.oddsshark.com/api/scores/nhl/{date}?_format=json"
+    print(base_url)
     headers = {
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://www.oddsshark.com/nhl/scores',
@@ -724,7 +725,7 @@ def match_team_names(source_name, target_names):
         str: The closest matching team name or None if no good match is found.
     """
     match, score = process.extractOne(source_name.lower(), [name.lower() for name in target_names], scorer=fuzz.ratio)
-    if score >= 80:  # Threshold for matching quality
+    if score >= 25:  # Threshold for matching quality
         return next(name for name in target_names if name.lower() == match)
     return None
 
