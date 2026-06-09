@@ -1,0 +1,8 @@
+name,language,review_count,average_rating,direct_interaction_verified,uses_ai_bot,uses_automation,response_rate,personalized_reply_ratio,avg_response_minutes,priority_score,profile_url
+Luna Vega,english,240,4.9,true,false,false,0.97,0.93,8,92,https://example.com/luna
+Mia Sol,spanish,165,4.8,true,false,false,0.95,0.90,12,89,https://example.com/mia
+Aria Bloom,english,120,4.7,true,false,false,0.92,0.88,18,85,https://example.com/aria
+Nova Jade,french,310,4.6,true,true,false,0.98,0.70,5,88,https://example.com/nova
+Kira Moon,english,75,4.5,false,false,false,0.84,0.79,40,78,https://example.com/kira
+Sofia Rey,spanish,220,4.85,true,false,false,0.96,0.94,9,90,https://example.com/sofia
+Emma North,english,95,4.4,true,false,true,0.90,0.75,22,80,https://example.com/emma
