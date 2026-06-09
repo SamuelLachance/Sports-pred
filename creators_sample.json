@@ -1,0 +1,311 @@
+{
+  "_comment": "Fictional sample data demonstrating the creator_ranker.py schema. Maintain your own dataset in this format - there is no public OnlyFans API and scraping violates their ToS.",
+  "creators": [
+    {
+      "username": "nina_fit",
+      "display_name": "Nina",
+      "languages": ["en", "es"],
+      "price_monthly": 12.99,
+      "categories": ["fitness", "lifestyle"],
+      "posts_per_week": 6,
+      "last_active_days": 0,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 2.5,
+        "reply_rate": 0.96,
+        "sends_voice_notes": true,
+        "does_live_streams": true,
+        "custom_content": true
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-05-30", "verified_purchase": true, "text": "She remembers what we talked about weeks ago and sends voice notes all the time. Real conversations, not scripted at all."},
+        {"rating": 5, "date": "2026-05-12", "verified_purchase": true, "text": "Replied to me personally within an hour, knows my name, genuinely the best interaction on the platform."},
+        {"rating": 4, "date": "2026-04-02", "verified_purchase": true, "text": "Custom video request was done in two days. She actually talks to you."},
+        {"rating": 5, "date": "2026-03-18", "verified_purchase": false, "text": "Live streams every week and answers questions in real time."},
+        {"rating": 5, "date": "2026-02-25", "verified_purchase": true, "text": "Quick replies, very personal touch."},
+        {"rating": 4, "date": "2026-01-10", "verified_purchase": true, "text": "Worth it, a real person behind the account."}
+      ]
+    },
+    {
+      "username": "lena_cosplay",
+      "display_name": "Lena",
+      "languages": ["de", "en"],
+      "price_monthly": 9.99,
+      "categories": ["cosplay", "gaming"],
+      "posts_per_week": 4,
+      "last_active_days": 1,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 6.0,
+        "reply_rate": 0.9,
+        "sends_voice_notes": true,
+        "does_live_streams": false,
+        "custom_content": true
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-05-20", "verified_purchase": true, "text": "Antwortet immer selbst, sehr genuine. She remembers my favorite characters and sends voice notes in German."},
+        {"rating": 5, "date": "2026-04-15", "verified_purchase": true, "text": "Real chats about games we both play. Replies personally, never generic."},
+        {"rating": 4, "date": "2026-03-08", "verified_purchase": true, "text": "Custom cosplay request was perfect."},
+        {"rating": 4, "date": "2026-02-01", "verified_purchase": false, "text": "Takes a few hours to reply but it is actually her."}
+      ]
+    },
+    {
+      "username": "sofia_arts",
+      "display_name": "Sofia",
+      "languages": ["es", "pt"],
+      "price_monthly": 7.5,
+      "categories": ["art", "lifestyle"],
+      "posts_per_week": 3,
+      "last_active_days": 2,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 10.0,
+        "reply_rate": 0.85,
+        "sends_voice_notes": false,
+        "does_live_streams": true,
+        "custom_content": true
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-05-05", "verified_purchase": true, "text": "Responde personalmente, real conversations every time."},
+        {"rating": 4, "date": "2026-03-22", "verified_purchase": true, "text": "Genuine person, actually reads your messages and answers thoughtfully."},
+        {"rating": 4, "date": "2026-02-14", "verified_purchase": false, "text": "Slower replies but always her, very personal replies."}
+      ]
+    },
+    {
+      "username": "mia_mass",
+      "display_name": "Mia",
+      "languages": ["en"],
+      "price_monthly": 14.99,
+      "categories": ["lifestyle"],
+      "posts_per_week": 7,
+      "last_active_days": 0,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": true,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 0.5,
+        "reply_rate": 0.99,
+        "sends_voice_notes": false,
+        "does_live_streams": false,
+        "custom_content": false
+      },
+      "reviews": [
+        {"rating": 4, "date": "2026-05-28", "verified_purchase": true, "text": "Fast replies but they feel like mass messages sometimes."},
+        {"rating": 3, "date": "2026-04-19", "verified_purchase": true, "text": "Gets the same message every morning, clearly automated blasts."},
+        {"rating": 4, "date": "2026-03-03", "verified_purchase": false, "text": "Content is good."}
+      ]
+    },
+    {
+      "username": "kira_ai",
+      "display_name": "Kira",
+      "languages": ["en", "fr"],
+      "price_monthly": 19.99,
+      "categories": ["fashion"],
+      "posts_per_week": 5,
+      "last_active_days": 0,
+      "interaction": {
+        "replies_personally": false,
+        "uses_ai_chatbot": true,
+        "uses_auto_dm": true,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 0.1,
+        "reply_rate": 1.0,
+        "sends_voice_notes": false,
+        "does_live_streams": false,
+        "custom_content": false
+      },
+      "reviews": [
+        {"rating": 2, "date": "2026-05-15", "verified_purchase": true, "text": "Instant replies 24/7 but it is obviously a bot, pure chatgpt answers."},
+        {"rating": 3, "date": "2026-04-10", "verified_purchase": true, "text": "Generic responses, never addresses what you actually said."},
+        {"rating": 2, "date": "2026-02-20", "verified_purchase": false, "text": "Automated everything."}
+      ]
+    },
+    {
+      "username": "amelie_paris",
+      "display_name": "Amélie",
+      "languages": ["fr", "en"],
+      "price_monthly": 11.0,
+      "categories": ["fashion", "travel"],
+      "posts_per_week": 4,
+      "last_active_days": 1,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 8.0,
+        "reply_rate": 0.88,
+        "sends_voice_notes": true,
+        "does_live_streams": true,
+        "custom_content": false
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-05-25", "verified_purchase": true, "text": "Elle répond elle-même, voice notes in French and English, remembers our chats."},
+        {"rating": 5, "date": "2026-04-30", "verified_purchase": true, "text": "Real person, real conversations. Livestreams from Paris are great."},
+        {"rating": 4, "date": "2026-03-12", "verified_purchase": true, "text": "Replies personally even if it takes a few hours."},
+        {"rating": 4, "date": "2026-01-29", "verified_purchase": false, "text": "Genuine and friendly."}
+      ]
+    },
+    {
+      "username": "valentina_agency",
+      "display_name": "Valentina",
+      "languages": ["en", "es"],
+      "price_monthly": 24.99,
+      "categories": ["glamour"],
+      "posts_per_week": 7,
+      "last_active_days": 0,
+      "interaction": {
+        "replies_personally": false,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": true,
+        "avg_response_hours": 0.3,
+        "reply_rate": 1.0,
+        "sends_voice_notes": false,
+        "does_live_streams": false,
+        "custom_content": true
+      },
+      "reviews": [
+        {"rating": 3, "date": "2026-05-18", "verified_purchase": true, "text": "Replies all day but the tone changes constantly, pretty sure it is agency chatters, not really her."},
+        {"rating": 2, "date": "2026-04-05", "verified_purchase": true, "text": "Someone else is replying, they forgot everything we discussed the day before."},
+        {"rating": 4, "date": "2026-03-01", "verified_purchase": false, "text": "Photos are professional quality."}
+      ]
+    },
+    {
+      "username": "yuki_tokyo",
+      "display_name": "Yuki",
+      "languages": ["ja", "en"],
+      "price_monthly": 10.0,
+      "categories": ["cosplay", "art"],
+      "posts_per_week": 5,
+      "last_active_days": 0,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 4.0,
+        "reply_rate": 0.93,
+        "sends_voice_notes": true,
+        "does_live_streams": true,
+        "custom_content": true
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-06-01", "verified_purchase": true, "text": "Voice messages in Japanese and English, she actually cares and remembers everything."},
+        {"rating": 5, "date": "2026-05-10", "verified_purchase": true, "text": "Replied to me personally with a custom drawing. Real person, real talent."},
+        {"rating": 5, "date": "2026-04-22", "verified_purchase": true, "text": "Genuine conversations, fast replies."},
+        {"rating": 4, "date": "2026-03-15", "verified_purchase": false, "text": "Live streams are fun and interactive."},
+        {"rating": 5, "date": "2026-02-08", "verified_purchase": true, "text": "Knows my name and asks about my week. Best on the platform."}
+      ]
+    },
+    {
+      "username": "chloe_suspect",
+      "display_name": "Chloe",
+      "languages": ["en"],
+      "price_monthly": 8.99,
+      "categories": ["lifestyle"],
+      "posts_per_week": 6,
+      "last_active_days": 0,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 0.2,
+        "reply_rate": 1.0,
+        "sends_voice_notes": false,
+        "does_live_streams": false,
+        "custom_content": false
+      },
+      "reviews": [
+        {"rating": 3, "date": "2026-05-22", "verified_purchase": true, "text": "Replies are instant at 4am, feels like a bot honestly. Copy paste answers."},
+        {"rating": 2, "date": "2026-04-28", "verified_purchase": true, "text": "Scripted responses, she never actually reads what you write."},
+        {"rating": 3, "date": "2026-03-30", "verified_purchase": true, "text": "Same reply every time you ask something specific. Template stuff."},
+        {"rating": 4, "date": "2026-02-17", "verified_purchase": false, "text": "Posts often at least."}
+      ]
+    },
+    {
+      "username": "bianca_rio",
+      "display_name": "Bianca",
+      "languages": ["pt", "en"],
+      "price_monthly": 6.99,
+      "categories": ["fitness", "dance"],
+      "posts_per_week": 5,
+      "last_active_days": 1,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 5.0,
+        "reply_rate": 0.91,
+        "sends_voice_notes": true,
+        "does_live_streams": true,
+        "custom_content": false
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-05-27", "verified_purchase": true, "text": "Responde pessoalmente, voice notes em português, real conversations."},
+        {"rating": 4, "date": "2026-04-14", "verified_purchase": true, "text": "Genuine and fun, actually chats with you about dance."},
+        {"rating": 5, "date": "2026-03-05", "verified_purchase": false, "text": "Live dance streams every Friday, answers everyone personally."}
+      ]
+    },
+    {
+      "username": "emma_new",
+      "display_name": "Emma",
+      "languages": ["en"],
+      "price_monthly": 5.0,
+      "categories": ["lifestyle"],
+      "posts_per_week": 2,
+      "last_active_days": 4,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 14.0,
+        "reply_rate": 0.8,
+        "sends_voice_notes": false,
+        "does_live_streams": false,
+        "custom_content": true
+      },
+      "reviews": [
+        {"rating": 5, "date": "2026-05-08", "verified_purchase": true, "text": "New but very genuine, replied to me personally."}
+      ]
+    },
+    {
+      "username": "stella_quiet",
+      "display_name": "Stella",
+      "languages": ["en", "it"],
+      "price_monthly": 13.5,
+      "categories": ["glamour", "travel"],
+      "posts_per_week": 1,
+      "last_active_days": 21,
+      "interaction": {
+        "replies_personally": true,
+        "uses_ai_chatbot": false,
+        "uses_auto_dm": false,
+        "uses_agency_chatters": false,
+        "avg_response_hours": 40.0,
+        "reply_rate": 0.45,
+        "sends_voice_notes": false,
+        "does_live_streams": false,
+        "custom_content": false
+      },
+      "reviews": [
+        {"rating": 3, "date": "2026-02-11", "verified_purchase": true, "text": "Nice content but takes days to answer."},
+        {"rating": 3, "date": "2025-12-02", "verified_purchase": true, "text": "Rarely online lately."},
+        {"rating": 4, "date": "2025-10-19", "verified_purchase": false, "text": "Used to be more active."}
+      ]
+    }
+  ]
+}
